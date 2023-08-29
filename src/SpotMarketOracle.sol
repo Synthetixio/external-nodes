@@ -5,8 +5,9 @@ import "./interfaces/external/IExternalNode.sol";
 import "./interfaces/external/IAtomicOrderModule.sol";
 
 contract SpotMarketOracle is IExternalNode {
-    using DecimalMath for int64;
+    using DecimalMath for uint256;
     using SafeCastI256 for int256;
+    using SafeCastU256 for uint256;
 
     int256 public constant PRECISION = 18;
 
@@ -25,12 +26,12 @@ contract SpotMarketOracle is IExternalNode {
         uint128 marketId = uint128(runtimeValues[0]);
         uint256 synthAmount = uint256(runtimeValues[1]);
 
-        uint256 memory returnAmount = market.quoteSellExactIn(
+        uint256 memory synthValue = market.quoteSellExactIn(
             marketId,
             synthAmount
         );
 
-        return NodeOutput.Data(returnAmount, block.timestamp, 0, 0);
+        return NodeOutput.Data(synthValue / synthAmount, block.timestamp, 0, 0);
     }
 
     function isValid(
