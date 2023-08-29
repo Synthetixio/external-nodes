@@ -15,20 +15,20 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     using SafeCastI256 for int256;
 
     int256 public constant PRECISION = 18;
-
     address public immutable pythAddress;
-    bytes32 public immutable priceFeedId;
-    uint256 public immutable stalenessTolerance;
 
-    constructor(address _pythAddress, bytes32 _priceFeedId, uint256 _stalenessTolerance) {
+    constructor(address _pythAddress) {
         pythAddress = _pythAddress;
-        priceFeedId = _priceFeedId;
-        stalenessTolerance = _stalenessTolerance;
     }
 
     function process(
         bytes memory parameters
     ) internal view returns (NodeOutput.Data memory nodeOutput) {
+        (bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+            parameters,
+            (bytes32, uint256)
+        );
+        
         IPyth pyth = IPyth(pythAddress);
         PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceFeedId);
 
@@ -49,6 +49,11 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         if (nodeDefinition.parents.length > 0) {
             return false;
         }
+
+        (bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+            nodeDefinition.parameters,
+            (bytes32, uint256)
+        );
 
         // Must return relevant functions without error
         IPyth pyth = IPyth(pythAddress);
