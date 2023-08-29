@@ -18,10 +18,12 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     address public immutable pythAddress;
     bytes32 public immutable priceFeedId;
+    uint256 public immutable stalenessTolerance;
 
-    constructor(address _pythAddress, bytes32 _priceFeedId) {
+    constructor(address _pythAddress, bytes32 _priceFeedId, uint256 _stalenessTolerance) {
         pythAddress = _pythAddress;
         priceFeedId = _priceFeedId;
+        stalenessTolerance = _stalenessTolerance;
     }
 
     function process(
