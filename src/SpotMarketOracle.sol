@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.11 <0.9.0;
 
+import "./lib/OrderFees.sol";
+import "./lib/DecimalMath.sol";
 import "./interfaces/external/IExternalNode.sol";
 import "./interfaces/external/IAtomicOrderModule.sol";
 
@@ -20,22 +22,23 @@ contract SpotMarketOracle is IExternalNode {
     }
 
     function process(
-        bytes memory parameters,
-        bytes32[] memory runtimeKeys,
-        bytes32[] memory runtimeValues
-    ) internal view returns (NodeOutput.Data memory nodeOutput) {
+        NodeOutput.Data[] memory,
+        bytes memory parameters
+    ) external view returns (NodeOutput.Data memory nodeOutput) {
+        uint256[] memory runtimeValues = abi.decode(parameters, (uint256[]));
+
         IAtomicOrderModule market = IAtomicOrderModule(spotMarketAddress);
         uint128 marketId = uint128(runtimeValues[0]);
-        uint256 synthAmount = uint256(runtimeValues[1]);
+        uint256 synthAmount = runtimeValues[1];
 
-        uint256 memory synthValue = market.quoteSellExactIn(
+        (uint256 synthValue,) = market.quoteSellExactIn(
             marketId,
             synthAmount
         );
 
         return
             NodeOutput.Data(
-                synthValue.divDecimal(synthAmount),
+                int256(synthValue.divDecimal(synthAmount)),
                 block.timestamp,
                 0,
                 0
@@ -44,12 +47,16 @@ contract SpotMarketOracle is IExternalNode {
 
     function isValid(
         NodeDefinition.Data memory nodeDefinition
-    ) internal view returns (bool valid) {
+    ) external returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
         }
 
+        return true;
+    }
+
+    function supportsInterface(bytes4 interfaceID) external view returns (bool) {
         return true;
     }
 }
