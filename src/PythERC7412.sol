@@ -16,21 +16,22 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
-    uint256 public lastFulfillmentTime;
+    uint256 public lastFulfillmentBlockNumber;
 
     constructor(address _pythAddress) {
         pythAddress = _pythAddress;
     }
 
     function process(
+        NodeOutput.Data[] memory,
         bytes memory parameters
-    ) internal view returns (NodeOutput.Data memory nodeOutput) {
+    ) external view returns (NodeOutput.Data memory nodeOutput) {
         (bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
             parameters,
             (bytes32, uint256)
         );
 
-        if(lastFulfillmentTime == block.timestamp) {
+        if(lastFulfillmentBlockNumber == block.number) {
             IPyth pyth = IPyth(pythAddress);
             PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceFeedId);
 
@@ -46,7 +47,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         revert OracleDataRequired(address(this), abi.encode(priceFeedId, 0)); // "latest" represented by 0
     }
 
-    function isValid(NodeDefinition.Data memory nodeDefinition) internal view returns (bool valid) {
+    function isValid(NodeDefinition.Data memory nodeDefinition) external returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
@@ -60,12 +61,14 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         // Must return relevant functions without error
         IPyth pyth = IPyth(pythAddress);
         pyth.getPriceUnsafe(priceFeedId);
-        pyth.getUpdateFee(1);
+
+        bytes[] memory emptyUpdateData;
+        pyth.getUpdateFee(emptyUpdateData);
 
         return true;
     }
 
-    function oracleId() pure external returns (bytes32 oracleId) {
+    function oracleId() pure external returns (bytes32) {
         return bytes32("PYTH");
     }
 
@@ -74,14 +77,17 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
 
         try pyth.updatePriceFeeds(updateData) {
-            lastFulfillmentTime = block.timestamp;
+            lastFulfillmentBlockNumber = block.number;
         } catch Error(string memory reason) {
             if (keccak256(abi.encodePacked(reason)) == keccak256(abi.encodePacked("InsufficientFee"))) {
-                revert FeeRequired(pyth.getUpdateFee(updateData.length));
+                revert FeeRequired(pyth.getUpdateFee(updateData));
             } else {
                 revert(reason);
             }
         }
     }
 
+    function supportsInterface(bytes4 interfaceID) external view returns (bool) {
+        return true;
+    }
 }

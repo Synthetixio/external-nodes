@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.11 <0.9.0;
 
-import "@synthetixio/core-contracts/contracts/interfaces/IERC165.sol";
+import "./IERC165.sol";
 
-import "../../storage/NodeOutput.sol";
-import "../../storage/NodeDefinition.sol";
+import "../../lib/NodeOutput.sol";
+import "../../lib/NodeDefinition.sol";
 
 /// @title Interface for an external node
 interface IExternalNode is IERC165 {
