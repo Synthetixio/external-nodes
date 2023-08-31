@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.11 <0.9.0;
 
-// TODO: Better way to import from the monorepo?
+// TODO: Import via npm after next release
 import "./lib/DecimalMath.sol";
 import "./lib/SafeCast.sol";
 import "./lib/NodeOutput.sol";
@@ -16,6 +16,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
+    uint256 public lastFulfillmentTime;
 
     constructor(address _pythAddress) {
         pythAddress = _pythAddress;
@@ -28,20 +29,21 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             parameters,
             (bytes32, uint256)
         );
-        
-        IPyth pyth = IPyth(pythAddress);
-        PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceFeedId);
 
-        int256 factor = PRECISION + pythData.expo;
-        int256 price = factor > 0
-            ? pythData.price.upscale(factor.toUint())
-            : pythData.price.downscale((-factor).toUint());
+        if(lastFulfillmentTime == block.timestamp) {
+            IPyth pyth = IPyth(pythAddress);
+            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceFeedId);
 
-        if (block.timestamp - pythData.publishTime <= stalenessTolerance) {
-            return NodeOutput.Data(price, pythData.publishTime, 0, 0);
-        } else {
-            revert OracleDataRequired(address(this), abi.encode(priceFeedId, 0)); // "latest" represented by 0
+            int256 factor = PRECISION + pythData.expo;
+            int256 price = factor > 0
+                ? pythData.price.upscale(factor.toUint())
+                : pythData.price.downscale((-factor).toUint());
+
+            if (block.timestamp - pythData.publishTime <= stalenessTolerance) {
+                return NodeOutput.Data(price, pythData.publishTime, 0, 0);
+            }
         }
+        revert OracleDataRequired(address(this), abi.encode(priceFeedId, 0)); // "latest" represented by 0
     }
 
     function isValid(NodeDefinition.Data memory nodeDefinition) internal view returns (bool valid) {
@@ -72,6 +74,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
 
         try pyth.updatePriceFeeds(updateData) {
+            lastFulfillmentTime = block.timestamp;
         } catch Error(string memory reason) {
             if (keccak256(abi.encodePacked(reason)) == keccak256(abi.encodePacked("InsufficientFee"))) {
                 revert FeeRequired(pyth.getUpdateFee(updateData.length));
