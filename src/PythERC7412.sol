@@ -87,7 +87,10 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         }
     }
 
-    function supportsInterface(bytes4 interfaceID) external view returns (bool) {
-        return true;
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IExternalNode).interfaceId ||
+            interfaceId == type(IERC7412).interfaceId ||
+            interfaceId == this.supportsInterface.selector;
     }
 }

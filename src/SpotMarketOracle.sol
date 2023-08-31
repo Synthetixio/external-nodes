@@ -47,7 +47,7 @@ contract SpotMarketOracle is IExternalNode {
 
     function isValid(
         NodeDefinition.Data memory nodeDefinition
-    ) external returns (bool valid) {
+    ) external pure returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
@@ -56,7 +56,9 @@ contract SpotMarketOracle is IExternalNode {
         return true;
     }
 
-    function supportsInterface(bytes4 interfaceID) external view returns (bool) {
-        return true;
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IExternalNode).interfaceId ||
+            interfaceId == this.supportsInterface.selector;
     }
 }
