@@ -26,9 +26,9 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         NodeOutput.Data[] memory,
         bytes memory parameters
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+        (, bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
             parameters,
-            (bytes32, uint256)
+            (address, bytes32, uint256)
         );
 
         if(lastFulfillmentBlockNumber == block.number) {
@@ -47,15 +47,15 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         revert OracleDataRequired(address(this), abi.encode(priceFeedId, 0)); // "latest" represented by 0
     }
 
-    function isValid(NodeDefinition.Data memory nodeDefinition) external returns (bool valid) {
+    function isValid(NodeDefinition.Data memory nodeDefinition) external view returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
         }
 
-        (bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+        (, bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
             nodeDefinition.parameters,
-            (bytes32, uint256)
+            (address, bytes32, uint256)
         );
 
         // Must return relevant functions without error
