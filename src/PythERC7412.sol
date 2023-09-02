@@ -24,7 +24,9 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     function process(
         NodeOutput.Data[] memory,
-        bytes memory parameters
+        bytes memory parameters,
+				bytes32[] memory,
+				bytes32[] memory
     ) external view returns (NodeOutput.Data memory nodeOutput) {
         (, bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
             parameters,

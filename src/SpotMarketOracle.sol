@@ -23,7 +23,9 @@ contract SpotMarketOracle is IExternalNode {
 
     function process(
         NodeOutput.Data[] memory,
-        bytes memory parameters
+        bytes memory parameters,
+				bytes32[] memory,
+				bytes32[] memory
     ) external view returns (NodeOutput.Data memory nodeOutput) {
         uint256[] memory runtimeValues = abi.decode(parameters, (uint256[]));
 
