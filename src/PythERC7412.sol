@@ -28,14 +28,14 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 				bytes32[] memory,
 				bytes32[] memory
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (, bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+        (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
             parameters,
             (address, bytes32, uint256)
         );
 
         if(lastFulfillmentBlockNumber == block.number) {
             IPyth pyth = IPyth(pythAddress);
-            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceFeedId);
+            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
 
             int256 factor = PRECISION + pythData.expo;
             int256 price = factor > 0
@@ -46,7 +46,31 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 return NodeOutput.Data(price, pythData.publishTime, 0, 0);
             }
         }
-        revert OracleDataRequired(address(this), abi.encode(priceFeedId, 0)); // "latest" represented by 0
+
+        bytes32[] memory priceIds = new bytes32[](1);
+        priceIds[0] = priceId;
+
+        // The query is like this:
+        // Struct PythQuery {
+        //  priceIds: bytes32[],
+        //  request: PythRequest
+        // }
+        //
+        // Enum PythRequest {
+        //  Latest,
+        //  NoOlderThan(uint64), // Staleness tolerance
+        //  Benchmark(uint64)
+        // }
+        // 
+        // Currently only type 1 (NoOlderThan) is implemented
+        revert OracleDataRequired(
+            address(this),
+            abi.encode( // TODO: Use encodePacked in the future
+                priceIds,
+                uint8(1),
+                uint64(stalenessTolerance)
+            )
+        ); 
     }
 
     function isValid(NodeDefinition.Data memory nodeDefinition) external view returns (bool valid) {
@@ -55,7 +79,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             return false;
         }
 
-        (, bytes32 priceFeedId, uint256 stalenessTolerance) = abi.decode(
+        (, bytes32 priceFeedId,) = abi.decode(
             nodeDefinition.parameters,
             (address, bytes32, uint256)
         );
@@ -78,10 +102,29 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         IPyth pyth = IPyth(pythAddress);
         bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
 
-        try pyth.updatePriceFeeds(updateData) {
+        (bytes32[] memory priceIds, uint8 updateType, uint64 stalenessTolerance) = 
+            abi.decode(oracleQuery, (bytes32[], uint8, uint64));
+
+        require(updateType == 1, "Other update types are not supported yet");
+
+        uint64 minAcceptedPublishTime = uint64(block.timestamp) - stalenessTolerance;
+        
+        uint64[] memory publishTimes = new uint64[](priceIds.length);
+        
+        for (uint i = 0; i < priceIds.length; i++) {
+            publishTimes[i] = minAcceptedPublishTime;
+        }
+
+        try pyth.updatePriceFeedsIfNecessary{value: msg.value}(updateData, priceIds, publishTimes) {
             lastFulfillmentBlockNumber = block.number;
         } catch Error(string memory reason) {
-            if (keccak256(abi.encodePacked(reason)) == keccak256(abi.encodePacked("InsufficientFee"))) {
+            bytes32 hash = keccak256(abi.encodePacked(reason));
+            if (hash == keccak256(abi.encodePacked("NoFreshUpdate"))) {
+                // This revert means that there existed an update with
+                // publishTime >= minAcceptedPublishTime and hence the
+                // method reverts.
+                lastFulfillmentBlockNumber = block.number;
+            } else if (hash == keccak256(abi.encodePacked("InsufficientFee"))) {
                 revert FeeRequired(pyth.getUpdateFee(updateData));
             } else {
                 revert(reason);
