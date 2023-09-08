@@ -50,27 +50,33 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes32[] memory priceIds = new bytes32[](1);
         priceIds[0] = priceId;
 
-        // The query is like this:
-        // Struct PythQuery {
-        //  priceIds: bytes32[],
-        //  request: PythRequest
+
+        // In the future Pyth revert data will have the following
+        // Query schema:
+        //
+        // Enum PythQuery {
+        //  Latest = 0 {
+        //    bytes32[] priceIds,
+        //  },
+        //  NoOlderThan = 1 {
+        //    uint64 stalenessTolerance,
+        //    bytes32[] priceIds,
+        //  },
+        //  Benchmark = 2 {
+        //    uint64 publishTime,
+        //    bytes32[] priceIds,
+        //  }
         // }
         //
-        // Enum PythRequest {
-        //  Latest,
-        //  NoOlderThan(uint64), // Staleness tolerance
-        //  Benchmark(uint64)
-        // }
-        // 
-        // Currently only type 1 (NoOlderThan) is implemented
+        // This contract only implements the PythQuery::NoOlderThan
         revert OracleDataRequired(
             address(this),
-            abi.encode( // TODO: Use encodePacked in the future
-                priceIds,
-                uint8(1),
-                uint64(stalenessTolerance)
+            abi.encode(
+                uint8(1), // PythQuery::NoOlderThan tag
+                uint64(stalenessTolerance),
+                priceIds
             )
-        ); 
+        );
     }
 
     function isValid(NodeDefinition.Data memory nodeDefinition) external view returns (bool valid) {
@@ -98,19 +104,22 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         return bytes32("PYTH");
     }
 
-    function fulfillOracleQuery(bytes memory oracleQuery, bytes memory signedOffchainData) payable external {
+    function fulfillOracleQuery(bytes memory signedOffchainData) payable external {
         IPyth pyth = IPyth(pythAddress);
-        bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
 
-        (bytes32[] memory priceIds, uint8 updateType, uint64 stalenessTolerance) = 
-            abi.decode(oracleQuery, (bytes32[], uint8, uint64));
+        (
+            uint8 updateType,
+            uint64 stalenessTolerance,
+            bytes32[] memory priceIds,
+            bytes[] memory updateData
+        ) = abi.decode(signedOffchainData, (uint8, uint64, bytes32[], bytes[]));
 
         require(updateType == 1, "Other update types are not supported yet");
 
         uint64 minAcceptedPublishTime = uint64(block.timestamp) - stalenessTolerance;
-        
+
         uint64[] memory publishTimes = new uint64[](priceIds.length);
-        
+
         for (uint i = 0; i < priceIds.length; i++) {
             publishTimes[i] = minAcceptedPublishTime;
         }

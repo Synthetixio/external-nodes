@@ -6,5 +6,5 @@ interface IERC7412 {
   error OracleDataRequired(address oracleContract, bytes oracleQuery);
 
   function oracleId() view external returns (bytes32 oracleId);
-  function fulfillOracleQuery(bytes calldata oracleQuery, bytes calldata signedOffchainData) payable external;
+  function fulfillOracleQuery(bytes calldata signedOffchainData) payable external;
 }
