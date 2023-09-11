@@ -17,25 +17,29 @@ contract SpotMarketOracle is IExternalNode {
     int256 public constant PRECISION = 18;
 
     address public immutable spotMarketAddress;
-    uint128 public immutable marketId;
 
-    constructor(address _spotMarketAddress, uint128 _marketId) {
+    constructor(address _spotMarketAddress) {
         spotMarketAddress = _spotMarketAddress;
-        marketId = _marketId;
     }
 
     function process(
         NodeOutput.Data[] memory,
-        bytes memory,
-		bytes32[] memory runtimeKeys,
-		bytes32[] memory runtimeValues
+        bytes memory parameters,
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        uint256 synthAmount = uint(runtimeValues[0]);
+        (, uint128 marketId) = abi.decode(parameters, (address, uint128));
 
-        (uint256 synthValue,) = ISpotMarketSystem(spotMarketAddress).quoteSellExactIn(
-            marketId,
-            synthAmount
-        );
+        uint256 synthAmount;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "synthAmount") {
+                synthAmount = uint256(runtimeValues[i]);
+                break;
+            }
+        }
+
+        (uint256 synthValue, ) = ISpotMarketSystem(spotMarketAddress)
+            .quoteSellExactIn(marketId, synthAmount);
 
         return
             NodeOutput.Data(
@@ -57,7 +61,9 @@ contract SpotMarketOracle is IExternalNode {
         return true;
     }
 
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure returns (bool) {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == this.supportsInterface.selector;
