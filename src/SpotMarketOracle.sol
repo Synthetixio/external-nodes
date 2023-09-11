@@ -4,6 +4,7 @@ pragma solidity >=0.8.11 <0.9.0;
 import "./lib/OrderFees.sol";
 import "./lib/DecimalMath.sol";
 import "./interfaces/external/IExternalNode.sol";
+import "./interfaces/external/ISpotMarketSystem.sol";
 import "./interfaces/external/IAtomicOrderModule.sol";
 
 contract SpotMarketOracle is IExternalNode {
@@ -16,24 +17,22 @@ contract SpotMarketOracle is IExternalNode {
     int256 public constant PRECISION = 18;
 
     address public immutable spotMarketAddress;
+    uint128 public immutable marketId;
 
-    constructor(address _spotMarketAddress) {
+    constructor(address _spotMarketAddress, uint128 _marketId) {
         spotMarketAddress = _spotMarketAddress;
+        marketId = _marketId;
     }
 
     function process(
         NodeOutput.Data[] memory,
-        bytes memory parameters,
-				bytes32[] memory,
-				bytes32[] memory
+        bytes memory,
+		bytes32[] memory runtimeKeys,
+		bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        uint256[] memory runtimeValues = abi.decode(parameters, (uint256[]));
+        uint256 synthAmount = uint(runtimeValues[0]);
 
-        IAtomicOrderModule market = IAtomicOrderModule(spotMarketAddress);
-        uint128 marketId = uint128(runtimeValues[0]);
-        uint256 synthAmount = runtimeValues[1];
-
-        (uint256 synthValue,) = market.quoteSellExactIn(
+        (uint256 synthValue,) = ISpotMarketSystem(spotMarketAddress).quoteSellExactIn(
             marketId,
             synthAmount
         );
