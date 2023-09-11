@@ -42,7 +42,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 ? pythData.price.upscale(factor.toUint())
                 : pythData.price.downscale((-factor).toUint());
 
-            if (block.timestamp - pythData.publishTime <= stalenessTolerance) {
+            if (pythData.publishTime > block.timestamp || block.timestamp - pythData.publishTime <= stalenessTolerance) {
                 return NodeOutput.Data(price, pythData.publishTime, 0, 0);
             }
         }
@@ -126,17 +126,17 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
         try pyth.updatePriceFeedsIfNecessary{value: msg.value}(updateData, priceIds, publishTimes) {
             lastFulfillmentBlockNumber = block.number;
-        } catch Error(string memory reason) {
-            bytes32 hash = keccak256(abi.encodePacked(reason));
-            if (hash == keccak256(abi.encodePacked("NoFreshUpdate"))) {
+        } catch (bytes memory reason) {
+            if (reason[0] == 0xde && reason[1] == 0x2c && reason[2] == 0x57 && reason[3] == 0xfa) {
                 // This revert means that there existed an update with
                 // publishTime >= minAcceptedPublishTime and hence the
                 // method reverts.
                 lastFulfillmentBlockNumber = block.number;
-            } else if (hash == keccak256(abi.encodePacked("InsufficientFee"))) {
+            } else if (reason[0] == 0x02 && reason[1] == 0x5d && reason[2] == 0xbd && reason[3] == 0xd4) {
                 revert FeeRequired(pyth.getUpdateFee(updateData));
             } else {
-                revert(reason);
+								uint256 len = reason.length;
+                assembly { revert(add(reason, 0x20), len) }
             }
         }
     }
