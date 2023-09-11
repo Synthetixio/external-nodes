@@ -9,10 +9,8 @@ interface ISpotMarketSystem {
         int256 wrapperFees;
     }
 
-    function sellExactIn(
-        uint128 synthMarketId,
-        uint256 sellAmount,
-        uint256 minAmountReceived,
-        address referrer
-    ) external payable returns (uint256 returnAmount, OrderFeeData memory fees);
+    function quoteSellExactIn(
+        uint128 marketId,
+        uint256 synthAmount
+    ) external view returns (uint256 returnAmount, OrderFeeData memory fees);
 }
