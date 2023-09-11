@@ -32,7 +32,7 @@ contract SpotMarketOracle is IExternalNode {
 
         uint256 synthAmount;
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
-            if (runtimeKeys[i] == "synthAmount") {
+            if (runtimeKeys[i] == "size") {
                 synthAmount = uint256(runtimeValues[i]);
                 break;
             }
