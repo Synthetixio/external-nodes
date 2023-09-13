@@ -4,6 +4,7 @@ pragma solidity >=0.8.11 <0.9.0;
 import "./lib/OrderFees.sol";
 import "./lib/DecimalMath.sol";
 import "./interfaces/external/IExternalNode.sol";
+import "./interfaces/external/ISpotMarketSystem.sol";
 import "./interfaces/external/IAtomicOrderModule.sol";
 
 contract SpotMarketOracle is IExternalNode {
@@ -24,19 +25,21 @@ contract SpotMarketOracle is IExternalNode {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-				bytes32[] memory,
-				bytes32[] memory
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        uint256[] memory runtimeValues = abi.decode(parameters, (uint256[]));
+        (, uint128 marketId) = abi.decode(parameters, (address, uint128));
 
-        IAtomicOrderModule market = IAtomicOrderModule(spotMarketAddress);
-        uint128 marketId = uint128(runtimeValues[0]);
-        uint256 synthAmount = runtimeValues[1];
+        uint256 synthAmount;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "size") {
+                synthAmount = uint256(runtimeValues[i]);
+                break;
+            }
+        }
 
-        (uint256 synthValue,) = market.quoteSellExactIn(
-            marketId,
-            synthAmount
-        );
+        (uint256 synthValue, ) = ISpotMarketSystem(spotMarketAddress)
+            .quoteSellExactIn(marketId, synthAmount);
 
         return
             NodeOutput.Data(
@@ -58,7 +61,9 @@ contract SpotMarketOracle is IExternalNode {
         return true;
     }
 
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure returns (bool) {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == this.supportsInterface.selector;
