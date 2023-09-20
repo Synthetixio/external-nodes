@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.11 <0.9.0;
+pragma solidity >=0.8.11 <0.8.20;
 
 import "./lib/OrderFees.sol";
 import "./lib/DecimalMath.sol";
@@ -36,6 +36,10 @@ contract SpotMarketOracle is IExternalNode {
                 synthAmount = uint256(runtimeValues[i]);
                 break;
             }
+        }
+
+        if (synthAmount == 0) {
+            return NodeOutput.Data(int256(0), block.timestamp, 0, 0);
         }
 
         (uint256 synthValue, ) = ISpotMarketSystem(spotMarketAddress)

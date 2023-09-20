@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.11 <0.9.0;
+pragma solidity >=0.8.11 <0.8.20;
 
 // TODO: Import via npm after next release
 import "./lib/DecimalMath.sol";
@@ -18,6 +18,8 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     address public immutable pythAddress;
     uint256 public lastFulfillmentBlockNumber;
 
+    error NotSupported(uint8 updateType);
+
     constructor(address _pythAddress) {
         pythAddress = _pythAddress;
     }
@@ -25,15 +27,15 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-				bytes32[] memory,
-				bytes32[] memory
+        bytes32[] memory,
+        bytes32[] memory
     ) external view returns (NodeOutput.Data memory nodeOutput) {
         (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
             parameters,
             (address, bytes32, uint256)
         );
 
-        if(lastFulfillmentBlockNumber == block.number) {
+        if (lastFulfillmentBlockNumber == block.number) {
             IPyth pyth = IPyth(pythAddress);
             PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
 
@@ -42,14 +44,13 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 ? pythData.price.upscale(factor.toUint())
                 : pythData.price.downscale((-factor).toUint());
 
-            if (pythData.publishTime > block.timestamp || block.timestamp - pythData.publishTime <= stalenessTolerance) {
+            if (block.timestamp <= stalenessTolerance + pythData.publishTime) {
                 return NodeOutput.Data(price, pythData.publishTime, 0, 0);
             }
         }
 
         bytes32[] memory priceIds = new bytes32[](1);
         priceIds[0] = priceId;
-
 
         // In the future Pyth revert data will have the following
         // Query schema:
@@ -79,13 +80,15 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         );
     }
 
-    function isValid(NodeDefinition.Data memory nodeDefinition) external view returns (bool valid) {
+    function isValid(
+        NodeDefinition.Data memory nodeDefinition
+    ) external view returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
         }
 
-        (, bytes32 priceFeedId,) = abi.decode(
+        (, bytes32 priceFeedId, ) = abi.decode(
             nodeDefinition.parameters,
             (address, bytes32, uint256)
         );
@@ -100,11 +103,13 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         return true;
     }
 
-    function oracleId() pure external returns (bytes32) {
+    function oracleId() external pure returns (bytes32) {
         return bytes32("PYTH");
     }
 
-    function fulfillOracleQuery(bytes memory signedOffchainData) payable external {
+    function fulfillOracleQuery(
+        bytes memory signedOffchainData
+    ) external payable {
         IPyth pyth = IPyth(pythAddress);
 
         (
@@ -114,9 +119,12 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             bytes[] memory updateData
         ) = abi.decode(signedOffchainData, (uint8, uint64, bytes32[], bytes[]));
 
-        require(updateType == 1, "Other update types are not supported yet");
+        if (updateType != 1) {
+            revert NotSupported(updateType);
+        }
 
-        uint64 minAcceptedPublishTime = uint64(block.timestamp) - stalenessTolerance;
+        uint64 minAcceptedPublishTime = uint64(block.timestamp) -
+            stalenessTolerance;
 
         uint64[] memory publishTimes = new uint64[](priceIds.length);
 
@@ -124,24 +132,46 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             publishTimes[i] = minAcceptedPublishTime;
         }
 
-        try pyth.updatePriceFeedsIfNecessary{value: msg.value}(updateData, priceIds, publishTimes) {
+        try
+            pyth.updatePriceFeedsIfNecessary{value: msg.value}(
+                updateData,
+                priceIds,
+                publishTimes
+            )
+        {
             lastFulfillmentBlockNumber = block.number;
         } catch (bytes memory reason) {
-            if (reason[0] == 0xde && reason[1] == 0x2c && reason[2] == 0x57 && reason[3] == 0xfa) {
+            if (
+                reason.length == 4 &&
+                reason[0] == 0xde &&
+                reason[1] == 0x2c &&
+                reason[2] == 0x57 &&
+                reason[3] == 0xfa
+            ) {
                 // This revert means that there existed an update with
                 // publishTime >= minAcceptedPublishTime and hence the
                 // method reverts.
                 lastFulfillmentBlockNumber = block.number;
-            } else if (reason[0] == 0x02 && reason[1] == 0x5d && reason[2] == 0xbd && reason[3] == 0xd4) {
+            } else if (
+                reason.length == 4 &&
+                reason[0] == 0x02 &&
+                reason[1] == 0x5d &&
+                reason[2] == 0xbd &&
+                reason[3] == 0xd4
+            ) {
                 revert FeeRequired(pyth.getUpdateFee(updateData));
             } else {
-								uint256 len = reason.length;
-                assembly { revert(add(reason, 0x20), len) }
+                uint256 len = reason.length;
+                assembly {
+                    revert(add(reason, 0x20), len)
+                }
             }
         }
     }
 
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure returns (bool) {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == type(IERC7412).interfaceId ||
