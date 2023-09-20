@@ -56,9 +56,23 @@ contract SpotMarketOracle is IExternalNode {
 
     function isValid(
         NodeDefinition.Data memory nodeDefinition
-    ) external pure returns (bool valid) {
+    ) external view returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
+            return false;
+        }
+
+        (, uint128 marketId) = abi.decode(
+            nodeDefinition.parameters,
+            (address, uint128)
+        );
+
+        address synthAddress = ISpotMarketSystem(spotMarketAddress).getSynth(
+            marketId
+        );
+
+        //check if the market is registered
+        if (synthAddress == address(0)) {
             return false;
         }
 
