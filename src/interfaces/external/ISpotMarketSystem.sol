@@ -13,4 +13,8 @@ interface ISpotMarketSystem {
         uint128 marketId,
         uint256 synthAmount
     ) external view returns (uint256 returnAmount, OrderFeeData memory fees);
+
+    function getSynth(
+        uint128 marketId
+    ) external view returns (address synthAddress);
 }

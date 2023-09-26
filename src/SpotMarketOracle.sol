@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.11 <0.9.0;
+pragma solidity >=0.8.11 <0.8.20;
 
 import "./lib/OrderFees.sol";
 import "./lib/DecimalMath.sol";
@@ -38,6 +38,10 @@ contract SpotMarketOracle is IExternalNode {
             }
         }
 
+        if (synthAmount == 0) {
+            return NodeOutput.Data(int256(0), block.timestamp, 0, 0);
+        }
+
         (uint256 synthValue, ) = ISpotMarketSystem(spotMarketAddress)
             .quoteSellExactIn(marketId, synthAmount);
 
@@ -52,9 +56,23 @@ contract SpotMarketOracle is IExternalNode {
 
     function isValid(
         NodeDefinition.Data memory nodeDefinition
-    ) external pure returns (bool valid) {
+    ) external view returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
+            return false;
+        }
+
+        (, uint128 marketId) = abi.decode(
+            nodeDefinition.parameters,
+            (address, uint128)
+        );
+
+        address synthAddress = ISpotMarketSystem(spotMarketAddress).getSynth(
+            marketId
+        );
+
+        //check if the market is registered
+        if (synthAddress == address(0)) {
             return false;
         }
 
