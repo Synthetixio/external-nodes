@@ -16,7 +16,6 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
-    uint256 public lastFulfillmentBlockNumber;
 
     constructor(address _pythAddress) {
         pythAddress = _pythAddress;
@@ -25,26 +24,24 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-				bytes32[] memory,
-				bytes32[] memory
+		bytes32[] memory,
+		bytes32[] memory
     ) external view returns (NodeOutput.Data memory nodeOutput) {
         (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
             parameters,
             (address, bytes32, uint256)
         );
 
-        if(lastFulfillmentBlockNumber == block.number) {
-            IPyth pyth = IPyth(pythAddress);
-            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
+        IPyth pyth = IPyth(pythAddress);
+        PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
 
-            int256 factor = PRECISION + pythData.expo;
-            int256 price = factor > 0
-                ? pythData.price.upscale(factor.toUint())
-                : pythData.price.downscale((-factor).toUint());
+        int256 factor = PRECISION + pythData.expo;
+        int256 price = factor > 0
+            ? pythData.price.upscale(factor.toUint())
+            : pythData.price.downscale((-factor).toUint());
 
-            if (pythData.publishTime > block.timestamp || block.timestamp - pythData.publishTime <= stalenessTolerance) {
-                return NodeOutput.Data(price, pythData.publishTime, 0, 0);
-            }
+        if (pythData.publishTime > block.timestamp || block.timestamp - pythData.publishTime <= stalenessTolerance) {
+            return NodeOutput.Data(price, pythData.publishTime, 0, 0);
         }
 
         bytes32[] memory priceIds = new bytes32[](1);
@@ -125,17 +122,11 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         }
 
         try pyth.updatePriceFeedsIfNecessary{value: msg.value}(updateData, priceIds, publishTimes) {
-            lastFulfillmentBlockNumber = block.number;
         } catch (bytes memory reason) {
-            if (reason[0] == 0xde && reason[1] == 0x2c && reason[2] == 0x57 && reason[3] == 0xfa) {
-                // This revert means that there existed an update with
-                // publishTime >= minAcceptedPublishTime and hence the
-                // method reverts.
-                lastFulfillmentBlockNumber = block.number;
-            } else if (reason[0] == 0x02 && reason[1] == 0x5d && reason[2] == 0xbd && reason[3] == 0xd4) {
+            if (reason[0] == 0x02 && reason[1] == 0x5d && reason[2] == 0xbd && reason[3] == 0xd4) {
                 revert FeeRequired(pyth.getUpdateFee(updateData));
             } else {
-								uint256 len = reason.length;
+				uint256 len = reason.length;
                 assembly { revert(add(reason, 0x20), len) }
             }
         }
