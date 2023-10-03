@@ -16,7 +16,6 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
-    uint256 public lastFulfillmentBlockNumber;
 
     error NotSupported(uint8 updateType);
 
@@ -35,18 +34,16 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             (address, bytes32, uint256)
         );
 
-        if (lastFulfillmentBlockNumber == block.number) {
-            IPyth pyth = IPyth(pythAddress);
-            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
+        IPyth pyth = IPyth(pythAddress);
+        PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
 
-            int256 factor = PRECISION + pythData.expo;
-            int256 price = factor > 0
-                ? pythData.price.upscale(factor.toUint())
-                : pythData.price.downscale((-factor).toUint());
+        int256 factor = PRECISION + pythData.expo;
+        int256 price = factor > 0
+            ? pythData.price.upscale(factor.toUint())
+            : pythData.price.downscale((-factor).toUint());
 
-            if (block.timestamp <= stalenessTolerance + pythData.publishTime) {
-                return NodeOutput.Data(price, pythData.publishTime, 0, 0);
-            }
+        if (block.timestamp <= stalenessTolerance + pythData.publishTime) {
+            return NodeOutput.Data(price, pythData.publishTime, 0, 0);
         }
 
         bytes32[] memory priceIds = new bytes32[](1);
@@ -139,20 +136,8 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 publishTimes
             )
         {
-            lastFulfillmentBlockNumber = block.number;
         } catch (bytes memory reason) {
             if (
-                reason.length == 4 &&
-                reason[0] == 0xde &&
-                reason[1] == 0x2c &&
-                reason[2] == 0x57 &&
-                reason[3] == 0xfa
-            ) {
-                // This revert means that there existed an update with
-                // publishTime >= minAcceptedPublishTime and hence the
-                // method reverts.
-                lastFulfillmentBlockNumber = block.number;
-            } else if (
                 reason.length == 4 &&
                 reason[0] == 0x02 &&
                 reason[1] == 0x5d &&
