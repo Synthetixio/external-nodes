@@ -28,50 +28,19 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes memory parameters,
         bytes32[] memory,
         bytes32[] memory
-    ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
+    ) external view returns (NodeOutput.Data memory) {
+        (, bytes32 priceId) = abi.decode(
             parameters,
-            (address, bytes32, uint256)
+            (address, bytes32)
         );
-
-        IPyth pyth = IPyth(pythAddress);
-        PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
-
-        int256 factor = PRECISION + pythData.expo;
-        int256 price = factor > 0
-            ? pythData.price.upscale(factor.toUint())
-            : pythData.price.downscale((-factor).toUint());
-
-        if (block.timestamp <= stalenessTolerance + pythData.publishTime) {
-            return NodeOutput.Data(price, pythData.publishTime, 0, 0);
-        }
 
         bytes32[] memory priceIds = new bytes32[](1);
         priceIds[0] = priceId;
-
-        // In the future Pyth revert data will have the following
-        // Query schema:
-        //
-        // Enum PythQuery {
-        //  Latest = 0 {
-        //    bytes32[] priceIds,
-        //  },
-        //  NoOlderThan = 1 {
-        //    uint64 stalenessTolerance,
-        //    bytes32[] priceIds,
-        //  },
-        //  Benchmark = 2 {
-        //    uint64 publishTime,
-        //    bytes32[] priceIds,
-        //  }
-        // }
-        //
-        // This contract only implements the PythQuery::NoOlderThan
+        
         revert OracleDataRequired(
             address(this),
             abi.encode(
-                uint8(1), // PythQuery::NoOlderThan tag
-                uint64(stalenessTolerance),
+                uint8(0), // PythQuery::Latest tag
                 priceIds
             )
         );
@@ -85,9 +54,9 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             return false;
         }
 
-        (, bytes32 priceFeedId, ) = abi.decode(
+        (, bytes32 priceFeedId) = abi.decode(
             nodeDefinition.parameters,
-            (address, bytes32, uint256)
+            (address, bytes32)
         );
 
         // Must return relevant functions without error
