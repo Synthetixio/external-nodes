@@ -77,32 +77,11 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes memory signedOffchainData
     ) external payable {
         IPyth pyth = IPyth(pythAddress);
-
-        (
-            uint8 updateType,
-            uint64 stalenessTolerance,
-            bytes32[] memory priceIds,
-            bytes[] memory updateData
-        ) = abi.decode(signedOffchainData, (uint8, uint64, bytes32[], bytes[]));
-
-        if (updateType != 1) {
-            revert NotSupported(updateType);
-        }
-
-        uint64 minAcceptedPublishTime = uint64(block.timestamp) -
-            stalenessTolerance;
-
-        uint64[] memory publishTimes = new uint64[](priceIds.length);
-
-        for (uint i = 0; i < priceIds.length; i++) {
-            publishTimes[i] = minAcceptedPublishTime;
-        }
-
+        bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
+        
         try
-            pyth.updatePriceFeedsIfNecessary{value: msg.value}(
-                updateData,
-                priceIds,
-                publishTimes
+            pyth.updatePriceFeeds{value: msg.value}(
+                updateData
             )
         {
         } catch (bytes memory reason) {
