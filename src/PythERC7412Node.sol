@@ -9,6 +9,7 @@ import "./lib/NodeDefinition.sol";
 import "./interfaces/external/IExternalNode.sol";
 import "./interfaces/external/IPyth.sol";
 import "./interfaces/external/IERC7412.sol";
+import "./interfaces/external/PythStructs.sol";
 
 contract PythERC7412Node is IExternalNode, IERC7412 {
     using DecimalMath for int64;
@@ -16,6 +17,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
+    mapping(uint64 => PythStructs.Price) public benchmarkPrices;
 
     error NotSupported(uint8 updateType);
 
@@ -26,8 +28,8 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-        bytes32[] memory,
-        bytes32[] memory
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory) {
         (, bytes32 priceId) = abi.decode(
             parameters,
@@ -37,12 +39,47 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes32[] memory priceIds = new bytes32[](1);
         priceIds[0] = priceId;
         
-        revert OracleDataRequired(
-            address(this),
-            abi.encode(
+        uint256 timestamp;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "timestamp") {
+                timestamp = uint256(runtimeValues[i]);
+                break;
+            }
+        }
+
+        // In the future Pyth revert data will have the following
+        // Query schema:
+        //
+        // Enum PythQuery {
+        //  Latest = 0 {
+        //    bytes32[] priceIds,
+        //  },
+        //  NoOlderThan = 1 {
+        //    uint64 stalenessTolerance,
+        //    bytes32[] priceIds,
+        //  },
+        //  Benchmark = 2 {
+        //    uint64 publishTime,
+        //    bytes32[] priceIds,
+        //  }
+        // }
+        bytes memory oracleQuery;
+        if(timestamp == 0) {
+            oracleQuery = abi.encode(
                 uint8(0), // PythQuery::Latest tag
                 priceIds
-            )
+            );
+        } else {
+            oracleQuery = abi.encode(
+                uint8(2), // PythQuery::Benchmark tag
+                uint64(timestamp),
+                priceIds
+            );
+        }
+
+        revert OracleDataRequired(
+            address(this),
+            oracleQuery
         );
     }
 
@@ -84,6 +121,8 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 updateData
             )
         {
+            // TODO: If this is a price older than Pyth's latest (returning from a benchmark query) store it to benchmarkPrices
+            // TODO: This contract needs to proxy price retrieval functions to Pyth's contract, except it returns data from benchmarkPrices when needed
         } catch (bytes memory reason) {
             if (
                 reason.length == 4 &&
