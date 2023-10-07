@@ -47,6 +47,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             }
         }
         
+        // The Staleness Tolerance Node could potentially set the runtime to its stalenessTolerance parameter value if it's unset
         uint256 stalenessTolerance;
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
             if (runtimeKeys[i] == "stalenessTolerance") {
@@ -71,7 +72,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
             oracleQuery = abi.encode(
                 uint8(1), // PythQuery::NoOlderThan tag
-                uint64(stalenessTolerance), // The stalenessTolerance node could potentially set the runtime to it's parameter value if it's unset
+                uint64(stalenessTolerance),
                 priceIds
             );
         } else {
