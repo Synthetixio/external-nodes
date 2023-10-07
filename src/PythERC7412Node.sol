@@ -46,30 +46,43 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
                 break;
             }
         }
+        
+        uint256 stalenessTolerance;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "stalenessTolerance") {
+                stalenessTolerance = uint256(runtimeValues[i]);
+                break;
+            }
+        }
 
-        // In the future Pyth revert data will have the following
-        // Query schema:
-        //
-        // Enum PythQuery {
-        //  Latest = 0 {
-        //    bytes32[] priceIds,
-        //  },
-        //  NoOlderThan = 1 {
-        //    uint64 stalenessTolerance,
-        //    bytes32[] priceIds,
-        //  },
-        //  Benchmark = 2 {
-        //    uint64 publishTime,
-        //    bytes32[] priceIds,
-        //  }
-        // }
         bytes memory oracleQuery;
         if(timestamp == 0) {
+            IPyth pyth = IPyth(pythAddress);
+            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
+
+            int256 factor = PRECISION + pythData.expo;
+            int256 price = factor > 0
+                ? pythData.price.upscale(factor.toUint())
+                : pythData.price.downscale((-factor).toUint());
+
+            if (block.timestamp - pythData.publishTime <= stalenessTolerance) {
+                return NodeOutput.Data(price, pythData.publishTime, 0, 0);
+            }
+
             oracleQuery = abi.encode(
-                uint8(0), // PythQuery::Latest tag
+                uint8(1), // PythQuery::NoOlderThan tag
+                uint64(stalenessTolerance), // The stalenessTolerance node could potentially set the runtime to it's parameter value if it's unset
                 priceIds
             );
         } else {
+            PythStructs.Price memory benchmarkPrice = benchmarkPrices[uint64(timestamp)];
+            if(benchmarkPrice.price != 0 && benchmarkPrice.expo != 0){
+                int256 factor = PRECISION + benchmarkPrice.expo;
+                int256 price = factor > 0
+                    ? benchmarkPrice.price.upscale(factor.toUint())
+                    : benchmarkPrice.price.downscale((-factor).toUint());
+                return NodeOutput.Data(price, benchmarkPrice.publishTime, 0, 0);
+            }
             oracleQuery = abi.encode(
                 uint8(2), // PythQuery::Benchmark tag
                 uint64(timestamp),
@@ -122,7 +135,6 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             )
         {
             // TODO: If this is a price older than Pyth's latest (returning from a benchmark query) store it to benchmarkPrices
-            // TODO: This contract needs to proxy price retrieval functions to Pyth's contract, except it returns data from benchmarkPrices when needed
         } catch (bytes memory reason) {
             if (
                 reason.length == 4 &&
