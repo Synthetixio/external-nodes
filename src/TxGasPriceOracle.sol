@@ -20,9 +20,40 @@ contract TxGasPriceOracle is IExternalNode {
     address public immutable spotMarketAddress;
     address public immutable ovmGasPriceOracleAddress;
 
-    constructor(address _spotMarketAddress, address _ovmGasPriceOracleAddress) {
+    uint256 private immutable variableL1FlagGasUnits;
+    uint256 private immutable variableL2FlagGasUnits;
+    uint256 private immutable fixedL1FlagGasUnits;
+    uint256 private immutable fixedL2FlagGasUnits;
+    uint256 private immutable variableL1RateLimitedGasUnits;
+    uint256 private immutable variableL2RateLimitedGasUnits;
+    uint256 private immutable fixedL1RateLimitedGasUnits;
+    uint256 private immutable fixedL2RateLimitedGasUnits;
+
+    constructor(
+        address _spotMarketAddress,
+        address _ovmGasPriceOracleAddress,
+        uint256 _variableL1FlagGasUnits,
+        uint256 _variableL2FlagGasUnits,
+        uint256 _fixedL1FlagGasUnits,
+        uint256 _fixedL2FlagGasUnits,
+        uint256 _variableL1RateLimitedGasUnits,
+        uint256 _variableL2RateLimitedGasUnits,
+        uint256 _fixedL1RateLimitedGasUnits,
+        uint256 _fixedL2RateLimitedGasUnits
+    ) {
+        // Addresses configuration
         spotMarketAddress = _spotMarketAddress;
         ovmGasPriceOracleAddress = _ovmGasPriceOracleAddress;
+
+        // Params configuration
+        variableL1FlagGasUnits = _variableL1FlagGasUnits;
+        variableL2FlagGasUnits = _variableL2FlagGasUnits;
+        fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
+        fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
+        variableL1RateLimitedGasUnits = _variableL1RateLimitedGasUnits;
+        variableL2RateLimitedGasUnits = _variableL2RateLimitedGasUnits;
+        fixedL1RateLimitedGasUnits = _fixedL1RateLimitedGasUnits;
+        fixedL2RateLimitedGasUnits = _fixedL2RateLimitedGasUnits;
     }
 
     function process(
@@ -86,59 +117,50 @@ contract TxGasPriceOracle is IExternalNode {
             );
     }
 
-    function getParameters()
-        external
-        view
-        returns (
-            uint256 variableL1FlagGasUnits,
-            uint256 variableL2FlagGasUnits,
-            uint256 fixedL1FlagGasUnits,
-            uint256 fixedL2FlagGasUnits,
-            uint256 variableL1RateLimitedGasUnits,
-            uint256 variableL2RateLimitedGasUnits,
-            uint256 fixedL1RateLimitedGasUnits,
-            uint256 fixedL2RateLimitedGasUnits
-        )
-    {
-        variableL1FlagGasUnits = _variableL1FlagGasUnits;
-        variableL2FlagGasUnits = _variableL2FlagGasUnits;
-        fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
-        fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
-        variableL1RateLimitedGasUnits = _variableL1RateLimitedGasUnits;
-        variableL2RateLimitedGasUnits = _variableL2RateLimitedGasUnits;
-        fixedL1RateLimitedGasUnits = _fixedL1RateLimitedGasUnits;
-        fixedL2RateLimitedGasUnits = _fixedL2RateLimitedGasUnits;
-    }
+    // function getParameters()
+    //     external
+    //     view
+    //     returns (
+    //         uint256 variableL1FlagGasUnits,
+    //         uint256 variableL2FlagGasUnits,
+    //         uint256 fixedL1FlagGasUnits,
+    //         uint256 fixedL2FlagGasUnits,
+    //         uint256 variableL1RateLimitedGasUnits,
+    //         uint256 variableL2RateLimitedGasUnits,
+    //         uint256 fixedL1RateLimitedGasUnits,
+    //         uint256 fixedL2RateLimitedGasUnits
+    //     )
+    // {
+    //     variableL1FlagGasUnits = _variableL1FlagGasUnits;
+    //     variableL2FlagGasUnits = _variableL2FlagGasUnits;
+    //     fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
+    //     fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
+    //     variableL1RateLimitedGasUnits = _variableL1RateLimitedGasUnits;
+    //     variableL2RateLimitedGasUnits = _variableL2RateLimitedGasUnits;
+    //     fixedL1RateLimitedGasUnits = _fixedL1RateLimitedGasUnits;
+    //     fixedL2RateLimitedGasUnits = _fixedL2RateLimitedGasUnits;
+    // }
 
     // @dev Sets params used for gas price computation.
-    function setParameters(
-        uint256 variableL1FlagGasUnits,
-        uint256 variableL2FlagGasUnits,
-        uint256 fixedL1FlagGasUnits,
-        uint256 fixedL2FlagGasUnits,
-        uint256 variableL1RateLimitedGasUnits,
-        uint256 variableL2RateLimitedGasUnits,
-        uint256 fixedL1RateLimitedGasUnits,
-        uint256 fixedL2RateLimitedGasUnits
-    ) external /* onlyOwner */ {
-        _variableL1FlagGasUnits = variableL1FlagGasUnits;
-        _variableL2FlagGasUnits = variableL2FlagGasUnits;
-        _fixedL1FlagGasUnits = fixedL1FlagGasUnits;
-        _fixedL2FlagGasUnits = fixedL2FlagGasUnits;
-        _variableL1RateLimitedGasUnits = variableL1RateLimitedGasUnits;
-        _variableL2RateLimitedGasUnits = variableL2RateLimitedGasUnits;
-        _fixedL1RateLimitedGasUnits = fixedL1RateLimitedGasUnits;
-        _fixedL2RateLimitedGasUnits = fixedL2RateLimitedGasUnits;
-    }
-
-    uint256 private _variableL1FlagGasUnits;
-    uint256 private _variableL2FlagGasUnits;
-    uint256 private _fixedL1FlagGasUnits;
-    uint256 private _fixedL2FlagGasUnits;
-    uint256 private _variableL1RateLimitedGasUnits;
-    uint256 private _variableL2RateLimitedGasUnits;
-    uint256 private _fixedL1RateLimitedGasUnits;
-    uint256 private _fixedL2RateLimitedGasUnits;
+    // function setParameters(
+    //     uint256 variableL1FlagGasUnits,
+    //     uint256 variableL2FlagGasUnits,
+    //     uint256 fixedL1FlagGasUnits,
+    //     uint256 fixedL2FlagGasUnits,
+    //     uint256 variableL1RateLimitedGasUnits,
+    //     uint256 variableL2RateLimitedGasUnits,
+    //     uint256 fixedL1RateLimitedGasUnits,
+    //     uint256 fixedL2RateLimitedGasUnits
+    // ) external /* onlyOwner */ {
+    //     _variableL1FlagGasUnits = variableL1FlagGasUnits;
+    //     _variableL2FlagGasUnits = variableL2FlagGasUnits;
+    //     _fixedL1FlagGasUnits = fixedL1FlagGasUnits;
+    //     _fixedL2FlagGasUnits = fixedL2FlagGasUnits;
+    //     _variableL1RateLimitedGasUnits = variableL1RateLimitedGasUnits;
+    //     _variableL2RateLimitedGasUnits = variableL2RateLimitedGasUnits;
+    //     _fixedL1RateLimitedGasUnits = fixedL1RateLimitedGasUnits;
+    //     _fixedL2RateLimitedGasUnits = fixedL2RateLimitedGasUnits;
+    // }
 
     function getCostOfExecutionGrossEth(
         uint positionSize,
@@ -155,18 +177,18 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 decimals = ovmGasPriceOracle.decimals();
         uint256 scalar = ovmGasPriceOracle.scalar();
 
-        uint256 rateLimitRuns = positionSize / rateLimit;
-        uint256 gasUnitsRateLimitedL1 = (_variableL1RateLimitedGasUnits +
-            _fixedL1RateLimitedGasUnits) * rateLimitRuns;
-        uint256 gasUnitsRateLimitedL2 = (_variableL2RateLimitedGasUnits +
-            _fixedL2RateLimitedGasUnits) * rateLimitRuns;
+        uint256 rateLimitRuns = ceilDivide(positionSize, rateLimit);
+        uint256 gasUnitsRateLimitedL1 = (variableL1RateLimitedGasUnits +
+            fixedL1RateLimitedGasUnits) * rateLimitRuns;
+        uint256 gasUnitsRateLimitedL2 = (variableL2RateLimitedGasUnits +
+            fixedL2RateLimitedGasUnits) * rateLimitRuns;
 
         uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds *
-            _variableL1FlagGasUnits +
-            _fixedL1FlagGasUnits;
+            variableL1FlagGasUnits +
+            fixedL1FlagGasUnits;
         uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds *
-            _variableL2FlagGasUnits +
-            _fixedL2FlagGasUnits;
+            variableL2FlagGasUnits +
+            fixedL2FlagGasUnits;
 
         uint256 gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
         uint256 gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
@@ -195,5 +217,10 @@ contract TxGasPriceOracle is IExternalNode {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == this.supportsInterface.selector;
+    }
+
+    function ceilDivide(uint a, uint b) internal pure returns (uint) {
+        if (b == 0) return 0;
+        return a / b + (a % b == 0 ? 0 : 1);
     }
 }
