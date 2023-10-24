@@ -14,24 +14,35 @@ contract TxGasPriceOracle is IExternalNode {
     using SafeCastI256 for int256;
     using SafeCastU256 for uint256;
 
-    int256 public constant PRECISION = 18;
     uint256 private constant UNIT = 10 ** uint(18);
 
-    address public immutable spotMarketAddress;
     address public immutable ovmGasPriceOracleAddress;
 
+    uint256 public constant KIND_SETTLEMENT = 0;
+    uint256 public constant KIND_REQUIRED_MARGIN = 1;
+    uint256 public constant KIND_FLAG = 2;
+    uint256 public constant KIND_LIQUIDATE = 3;
+
+    // Order execution
+    uint256 private immutable l1ExecuteGasUnits;
+    uint256 private immutable l2ExecuteGasUnits;
+
+    // Flag
     uint256 private immutable variableL1FlagGasUnits;
     uint256 private immutable variableL2FlagGasUnits;
     uint256 private immutable fixedL1FlagGasUnits;
     uint256 private immutable fixedL2FlagGasUnits;
+
+    // Liquidate (Rate limited)
     uint256 private immutable variableL1RateLimitedGasUnits;
     uint256 private immutable variableL2RateLimitedGasUnits;
     uint256 private immutable fixedL1RateLimitedGasUnits;
     uint256 private immutable fixedL2RateLimitedGasUnits;
 
     constructor(
-        address _spotMarketAddress,
         address _ovmGasPriceOracleAddress,
+        uint256 _L1ExecuteGasUnits,
+        uint256 _L2ExecuteGasUnits,
         uint256 _variableL1FlagGasUnits,
         uint256 _variableL2FlagGasUnits,
         uint256 _fixedL1FlagGasUnits,
@@ -42,10 +53,11 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 _fixedL2RateLimitedGasUnits
     ) {
         // Addresses configuration
-        spotMarketAddress = _spotMarketAddress;
         ovmGasPriceOracleAddress = _ovmGasPriceOracleAddress;
 
         // Params configuration
+        l1ExecuteGasUnits = _L1ExecuteGasUnits;
+        l2ExecuteGasUnits = _L2ExecuteGasUnits;
         variableL1FlagGasUnits = _variableL1FlagGasUnits;
         variableL2FlagGasUnits = _variableL2FlagGasUnits;
         fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
@@ -58,17 +70,20 @@ contract TxGasPriceOracle is IExternalNode {
 
     function process(
         NodeOutput.Data[] memory,
-        bytes memory parameters,
+        bytes memory,
         bytes32[] memory runtimeKeys,
         bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (, uint128 marketId) = abi.decode(parameters, (address, uint128));
-
         uint256 positionSize;
         uint256 rateLimit;
         uint256 numberOfUpdatedFeeds;
+        uint256 executionKind;
 
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "executionKind") {
+                executionKind = uint256(runtimeValues[i]);
+                continue;
+            }
             if (runtimeKeys[i] == "positionSize") {
                 positionSize = uint256(runtimeValues[i]);
                 continue;
@@ -83,90 +98,23 @@ contract TxGasPriceOracle is IExternalNode {
             }
         }
 
-        ISpotMarketSystem spotMarketSystem = ISpotMarketSystem(
-            spotMarketAddress
-        );
-
-        uint256 costOfExecutionGrossEth = getCostOfExecutionGrossEth(
+        uint256 costOfExecutionEth = getCostOfExecutionEth(
             positionSize,
             rateLimit,
-            numberOfUpdatedFeeds
+            numberOfUpdatedFeeds,
+            executionKind
         );
-
-        // ETH to USD
-        (uint256 ethPrice, ) = spotMarketSystem.quoteSellExactIn(
-            marketId,
-            costOfExecutionGrossEth
-        );
-
-        uint256 costOfExecutionGross = costOfExecutionGrossEth.divDecimal(
-            ethPrice
-        );
-
-        // uint256 maxProfitMargin = _profitMarginUSD.max(
-        //     costOfExecutionGross.mulDiv(_profitMarginPercent, UNIT)
-        // );
-        // uint256 costOfExecutionNet = costOfExecutionGross + maxProfitMargin;
 
         return
-            NodeOutput.Data(
-                costOfExecutionGross.toInt(),
-                block.timestamp,
-                0,
-                0
-            );
+            NodeOutput.Data(costOfExecutionEth.toInt(), block.timestamp, 0, 0);
     }
 
-    // function getParameters()
-    //     external
-    //     view
-    //     returns (
-    //         uint256 variableL1FlagGasUnits,
-    //         uint256 variableL2FlagGasUnits,
-    //         uint256 fixedL1FlagGasUnits,
-    //         uint256 fixedL2FlagGasUnits,
-    //         uint256 variableL1RateLimitedGasUnits,
-    //         uint256 variableL2RateLimitedGasUnits,
-    //         uint256 fixedL1RateLimitedGasUnits,
-    //         uint256 fixedL2RateLimitedGasUnits
-    //     )
-    // {
-    //     variableL1FlagGasUnits = _variableL1FlagGasUnits;
-    //     variableL2FlagGasUnits = _variableL2FlagGasUnits;
-    //     fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
-    //     fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
-    //     variableL1RateLimitedGasUnits = _variableL1RateLimitedGasUnits;
-    //     variableL2RateLimitedGasUnits = _variableL2RateLimitedGasUnits;
-    //     fixedL1RateLimitedGasUnits = _fixedL1RateLimitedGasUnits;
-    //     fixedL2RateLimitedGasUnits = _fixedL2RateLimitedGasUnits;
-    // }
-
-    // @dev Sets params used for gas price computation.
-    // function setParameters(
-    //     uint256 variableL1FlagGasUnits,
-    //     uint256 variableL2FlagGasUnits,
-    //     uint256 fixedL1FlagGasUnits,
-    //     uint256 fixedL2FlagGasUnits,
-    //     uint256 variableL1RateLimitedGasUnits,
-    //     uint256 variableL2RateLimitedGasUnits,
-    //     uint256 fixedL1RateLimitedGasUnits,
-    //     uint256 fixedL2RateLimitedGasUnits
-    // ) external /* onlyOwner */ {
-    //     _variableL1FlagGasUnits = variableL1FlagGasUnits;
-    //     _variableL2FlagGasUnits = variableL2FlagGasUnits;
-    //     _fixedL1FlagGasUnits = fixedL1FlagGasUnits;
-    //     _fixedL2FlagGasUnits = fixedL2FlagGasUnits;
-    //     _variableL1RateLimitedGasUnits = variableL1RateLimitedGasUnits;
-    //     _variableL2RateLimitedGasUnits = variableL2RateLimitedGasUnits;
-    //     _fixedL1RateLimitedGasUnits = fixedL1RateLimitedGasUnits;
-    //     _fixedL2RateLimitedGasUnits = fixedL2RateLimitedGasUnits;
-    // }
-
-    function getCostOfExecutionGrossEth(
+    function getCostOfExecutionEth(
         uint positionSize,
         uint rateLimit,
-        uint numberOfUpdatedFeeds
-    ) internal view returns (uint256) {
+        uint numberOfUpdatedFeeds,
+        uint executionKind
+    ) internal view returns (uint256 costOfExecutionGrossEth) {
         IOVM_GasPriceOracle ovmGasPriceOracle = IOVM_GasPriceOracle(
             ovmGasPriceOracleAddress
         );
@@ -177,27 +125,64 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 decimals = ovmGasPriceOracle.decimals();
         uint256 scalar = ovmGasPriceOracle.scalar();
 
-        uint256 rateLimitRuns = ceilDivide(positionSize, rateLimit);
-        uint256 gasUnitsRateLimitedL1 = (variableL1RateLimitedGasUnits +
-            fixedL1RateLimitedGasUnits) * rateLimitRuns;
-        uint256 gasUnitsRateLimitedL2 = (variableL2RateLimitedGasUnits +
-            fixedL2RateLimitedGasUnits) * rateLimitRuns;
+        (uint256 gasUnitsL1, uint256 gasUnitsL2) = getGasUnits(
+            positionSize,
+            rateLimit,
+            numberOfUpdatedFeeds,
+            executionKind
+        );
 
-        uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds *
-            variableL1FlagGasUnits +
-            fixedL1FlagGasUnits;
-        uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds *
-            variableL2FlagGasUnits +
-            fixedL2FlagGasUnits;
-
-        uint256 gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
-        uint256 gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
-
-        uint256 costOfExecutionGrossEth = ((((gasUnitsL1 + overhead) *
+        costOfExecutionGrossEth = ((((gasUnitsL1 + overhead) *
             l1BaseFee *
             scalar) / 10 ** decimals) + (gasUnitsL2 * gasPriceL2));
+    }
 
-        return costOfExecutionGrossEth;
+    function getGasUnits(
+        uint positionSize,
+        uint rateLimit,
+        uint numberOfUpdatedFeeds,
+        uint executionKind
+    ) internal view returns (uint256 gasUnitsL1, uint256 gasUnitsL2) {
+        if (executionKind == KIND_SETTLEMENT) {
+            gasUnitsL1 = l1ExecuteGasUnits;
+            gasUnitsL2 = l2ExecuteGasUnits;
+        } else if (executionKind == KIND_REQUIRED_MARGIN) {
+            // Rate limit gas units
+            uint256 rateLimitRuns = ceilDivide(positionSize, rateLimit);
+            uint256 gasUnitsRateLimitedL1 = (variableL1RateLimitedGasUnits +
+                fixedL1RateLimitedGasUnits) * rateLimitRuns;
+            uint256 gasUnitsRateLimitedL2 = (variableL2RateLimitedGasUnits +
+                fixedL2RateLimitedGasUnits) * rateLimitRuns;
+
+            // Flag gas units
+            uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds *
+                variableL1FlagGasUnits +
+                fixedL1FlagGasUnits;
+            uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds *
+                variableL2FlagGasUnits +
+                fixedL2FlagGasUnits;
+
+            gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
+            gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
+        } else if (executionKind == KIND_FLAG) {
+            // Flag gas units
+            gasUnitsL1 =
+                numberOfUpdatedFeeds *
+                variableL1FlagGasUnits +
+                fixedL1FlagGasUnits;
+            gasUnitsL2 =
+                numberOfUpdatedFeeds *
+                variableL2FlagGasUnits +
+                fixedL2FlagGasUnits;
+        } else if (executionKind == KIND_LIQUIDATE) {
+            // Iterations is fixed to 1 for liquidations
+            gasUnitsL1 = (variableL1RateLimitedGasUnits +
+                fixedL1RateLimitedGasUnits);
+            gasUnitsL2 = (variableL2RateLimitedGasUnits +
+                fixedL2RateLimitedGasUnits);
+        } else {
+            revert("Invalid execution kind");
+        }
     }
 
     function isValid(
