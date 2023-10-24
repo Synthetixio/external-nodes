@@ -26,10 +26,8 @@ contract TxGasPriceOracle is IExternalNode {
     uint256 private immutable fixedL2FlagGasUnits;
 
     // Liquidate (Rate limited)
-    uint256 private immutable variableL1RateLimitedGasUnits;
-    uint256 private immutable variableL2RateLimitedGasUnits;
-    uint256 private immutable fixedL1RateLimitedGasUnits;
-    uint256 private immutable fixedL2RateLimitedGasUnits;
+    uint256 private immutable l1RateLimitedGasUnits;
+    uint256 private immutable l2RateLimitedGasUnits;
 
     constructor(
         address _ovmGasPriceOracleAddress,
@@ -39,10 +37,8 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 _variableL2FlagGasUnits,
         uint256 _fixedL1FlagGasUnits,
         uint256 _fixedL2FlagGasUnits,
-        uint256 _variableL1RateLimitedGasUnits,
-        uint256 _variableL2RateLimitedGasUnits,
-        uint256 _fixedL1RateLimitedGasUnits,
-        uint256 _fixedL2RateLimitedGasUnits
+        uint256 _l1RateLimitedGasUnits,
+        uint256 _l2RateLimitedGasUnits
     ) {
         // Addresses configuration
         ovmGasPriceOracleAddress = _ovmGasPriceOracleAddress;
@@ -54,10 +50,8 @@ contract TxGasPriceOracle is IExternalNode {
         variableL2FlagGasUnits = _variableL2FlagGasUnits;
         fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
         fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
-        variableL1RateLimitedGasUnits = _variableL1RateLimitedGasUnits;
-        variableL2RateLimitedGasUnits = _variableL2RateLimitedGasUnits;
-        fixedL1RateLimitedGasUnits = _fixedL1RateLimitedGasUnits;
-        fixedL2RateLimitedGasUnits = _fixedL2RateLimitedGasUnits;
+        l1RateLimitedGasUnits = _l1RateLimitedGasUnits;
+        l2RateLimitedGasUnits = _l2RateLimitedGasUnits;
     }
 
     function process(
@@ -141,10 +135,10 @@ contract TxGasPriceOracle is IExternalNode {
         } else if (executionKind == KIND_REQUIRED_MARGIN) {
             // Rate limit gas units
             uint256 rateLimitRuns = ceilDivide(positionSize, rateLimit);
-            uint256 gasUnitsRateLimitedL1 = (variableL1RateLimitedGasUnits +
-                fixedL1RateLimitedGasUnits) * rateLimitRuns;
-            uint256 gasUnitsRateLimitedL2 = (variableL2RateLimitedGasUnits +
-                fixedL2RateLimitedGasUnits) * rateLimitRuns;
+            uint256 gasUnitsRateLimitedL1 = l1RateLimitedGasUnits *
+                rateLimitRuns;
+            uint256 gasUnitsRateLimitedL2 = l2RateLimitedGasUnits *
+                rateLimitRuns;
 
             // Flag gas units
             uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds *
@@ -168,10 +162,8 @@ contract TxGasPriceOracle is IExternalNode {
                 fixedL2FlagGasUnits;
         } else if (executionKind == KIND_LIQUIDATE) {
             // Iterations is fixed to 1 for liquidations
-            gasUnitsL1 = (variableL1RateLimitedGasUnits +
-                fixedL1RateLimitedGasUnits);
-            gasUnitsL2 = (variableL2RateLimitedGasUnits +
-                fixedL2RateLimitedGasUnits);
+            gasUnitsL1 = l1RateLimitedGasUnits;
+            gasUnitsL2 = l2RateLimitedGasUnits;
         } else {
             revert("Invalid execution kind");
         }

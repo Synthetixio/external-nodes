@@ -26,10 +26,8 @@ contract TxGasPriceOracleTest is Test {
             30,
             35,
             40,
-            45,
-            50,
-            55,
-            60
+            100,
+            110
         );
 
         mockParameters = abi.encode(address(0), uint128(1));
