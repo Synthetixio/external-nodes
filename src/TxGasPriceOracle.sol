@@ -3,18 +3,10 @@ pragma solidity >=0.8.11 <0.9.0;
 
 import "./lib/DecimalMath.sol";
 import "./interfaces/external/IExternalNode.sol";
-import "./interfaces/external/ISpotMarketSystem.sol";
-import "./interfaces/external/IAtomicOrderModule.sol";
 import "./interfaces/external/IOVM_GasPriceOracle.sol";
 
 contract TxGasPriceOracle is IExternalNode {
-    using DecimalMath for int256;
-    using DecimalMath for uint256;
-
-    using SafeCastI256 for int256;
     using SafeCastU256 for uint256;
-
-    uint256 private constant UNIT = 10 ** uint(18);
 
     address public immutable ovmGasPriceOracleAddress;
 
@@ -185,6 +177,11 @@ contract TxGasPriceOracle is IExternalNode {
         }
     }
 
+    function ceilDivide(uint a, uint b) internal pure returns (uint) {
+        if (b == 0) return 0;
+        return a / b + (a % b == 0 ? 0 : 1);
+    }
+
     function isValid(
         NodeDefinition.Data memory nodeDefinition
     ) external pure returns (bool valid) {
@@ -202,10 +199,5 @@ contract TxGasPriceOracle is IExternalNode {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == this.supportsInterface.selector;
-    }
-
-    function ceilDivide(uint a, uint b) internal pure returns (uint) {
-        if (b == 0) return 0;
-        return a / b + (a % b == 0 ? 0 : 1);
     }
 }
