@@ -15,85 +15,87 @@ contract TxGasPriceOracle is IExternalNode {
     uint256 public constant KIND_FLAG = 2;
     uint256 public constant KIND_LIQUIDATE = 3;
 
-    // Order execution
-    uint256 private immutable l1ExecuteGasUnits;
-    uint256 private immutable l2ExecuteGasUnits;
+    // // Order execution
+    // uint256 private immutable l1ExecuteGasUnits;
+    // uint256 private immutable l2ExecuteGasUnits;
 
-    // Flag
-    uint256 private immutable l1FlagGasUnits;
-    uint256 private immutable l2FlagGasUnits;
+    // // Flag
+    // uint256 private immutable l1FlagGasUnits;
+    // uint256 private immutable l2FlagGasUnits;
 
-    // Liquidate (Rate limited)
-    uint256 private immutable l1RateLimitedGasUnits;
-    uint256 private immutable l2RateLimitedGasUnits;
+    // // Liquidate (Rate limited)
+    // uint256 private immutable l1RateLimitedGasUnits;
+    // uint256 private immutable l2RateLimitedGasUnits;
 
-    constructor(
-        address _ovmGasPriceOracleAddress,
-        uint256 _L1ExecuteGasUnits,
-        uint256 _L2ExecuteGasUnits,
-        uint256 _l1FlagGasUnits,
-        uint256 _l2FlagGasUnits,
-        uint256 _l1RateLimitedGasUnits,
-        uint256 _l2RateLimitedGasUnits
-    ) {
-        // Addresses configuration
-        ovmGasPriceOracleAddress = _ovmGasPriceOracleAddress;
-
-        // Params configuration
-        l1ExecuteGasUnits = _L1ExecuteGasUnits;
-        l2ExecuteGasUnits = _L2ExecuteGasUnits;
-        l1FlagGasUnits = _l1FlagGasUnits;
-        l2FlagGasUnits = _l2FlagGasUnits;
-        l1RateLimitedGasUnits = _l1RateLimitedGasUnits;
-        l2RateLimitedGasUnits = _l2RateLimitedGasUnits;
-    }
-
-    function process(
-        NodeOutput.Data[] memory,
-        bytes memory,
-        bytes32[] memory runtimeKeys,
-        bytes32[] memory runtimeValues
-    ) external view returns (NodeOutput.Data memory nodeOutput) {
+    struct RuntimeParams {
+        // Order execution
+        uint256 l1ExecuteGasUnits;
+        uint256 l2ExecuteGasUnits;
+        // Flag
+        uint256 l1FlagGasUnits;
+        uint256 l2FlagGasUnits;
+        // Liquidate (Rate limited)
+        uint256 l1RateLimitedGasUnits;
+        uint256 l2RateLimitedGasUnits;
+        // Call params
         uint256 positionSize;
         uint256 rateLimit;
         uint256 numberOfUpdatedFeeds;
         uint256 executionKind;
+    }
+
+    constructor(address _ovmGasPriceOracleAddress) {
+        // Addresses configuration
+        ovmGasPriceOracleAddress = _ovmGasPriceOracleAddress;
+    }
+
+    function process(
+        NodeOutput.Data[] memory,
+        bytes memory parameters,
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
+    ) external view returns (NodeOutput.Data memory nodeOutput) {
+        RuntimeParams memory runtimeParams;
+        (
+            ,
+            runtimeParams.l1ExecuteGasUnits,
+            runtimeParams.l2ExecuteGasUnits,
+            runtimeParams.l1FlagGasUnits,
+            runtimeParams.l2FlagGasUnits,
+            runtimeParams.l1RateLimitedGasUnits,
+            runtimeParams.l2RateLimitedGasUnits
+        ) = abi.decode(
+            parameters,
+            (address, uint256, uint256, uint256, uint256, uint256, uint256)
+        );
 
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
             if (runtimeKeys[i] == "executionKind") {
-                executionKind = uint256(runtimeValues[i]);
+                runtimeParams.executionKind = uint256(runtimeValues[i]);
                 continue;
             }
             if (runtimeKeys[i] == "positionSize") {
-                positionSize = uint256(runtimeValues[i]);
+                runtimeParams.positionSize = uint256(runtimeValues[i]);
                 continue;
             }
             if (runtimeKeys[i] == "rateLimit") {
-                rateLimit = uint256(runtimeValues[i]);
+                runtimeParams.rateLimit = uint256(runtimeValues[i]);
                 continue;
             }
             if (runtimeKeys[i] == "numberOfUpdatedFeeds") {
-                numberOfUpdatedFeeds = uint256(runtimeValues[i]);
+                runtimeParams.numberOfUpdatedFeeds = uint256(runtimeValues[i]);
                 continue;
             }
         }
 
-        uint256 costOfExecutionEth = getCostOfExecutionEth(
-            positionSize,
-            rateLimit,
-            numberOfUpdatedFeeds,
-            executionKind
-        );
+        uint256 costOfExecutionEth = getCostOfExecutionEth(runtimeParams);
 
         return
             NodeOutput.Data(costOfExecutionEth.toInt(), block.timestamp, 0, 0);
     }
 
     function getCostOfExecutionEth(
-        uint positionSize,
-        uint rateLimit,
-        uint numberOfUpdatedFeeds,
-        uint executionKind
+        RuntimeParams memory runtimeParams
     ) internal view returns (uint256 costOfExecutionGrossEth) {
         IOVM_GasPriceOracle ovmGasPriceOracle = IOVM_GasPriceOracle(
             ovmGasPriceOracleAddress
@@ -105,12 +107,7 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 decimals = ovmGasPriceOracle.decimals();
         uint256 scalar = ovmGasPriceOracle.scalar();
 
-        (uint256 gasUnitsL1, uint256 gasUnitsL2) = getGasUnits(
-            positionSize,
-            rateLimit,
-            numberOfUpdatedFeeds,
-            executionKind
-        );
+        (uint256 gasUnitsL1, uint256 gasUnitsL2) = getGasUnits(runtimeParams);
 
         costOfExecutionGrossEth = ((((gasUnitsL1 + overhead) *
             l1BaseFee *
@@ -118,36 +115,42 @@ contract TxGasPriceOracle is IExternalNode {
     }
 
     function getGasUnits(
-        uint positionSize,
-        uint rateLimit,
-        uint numberOfUpdatedFeeds,
-        uint executionKind
-    ) internal view returns (uint256 gasUnitsL1, uint256 gasUnitsL2) {
-        if (executionKind == KIND_SETTLEMENT) {
-            gasUnitsL1 = l1ExecuteGasUnits;
-            gasUnitsL2 = l2ExecuteGasUnits;
-        } else if (executionKind == KIND_REQUIRED_MARGIN) {
+        RuntimeParams memory runtimeParams
+    ) internal pure returns (uint256 gasUnitsL1, uint256 gasUnitsL2) {
+        if (runtimeParams.executionKind == KIND_SETTLEMENT) {
+            gasUnitsL1 = runtimeParams.l1ExecuteGasUnits;
+            gasUnitsL2 = runtimeParams.l2ExecuteGasUnits;
+        } else if (runtimeParams.executionKind == KIND_REQUIRED_MARGIN) {
             // Rate limit gas units
-            uint256 rateLimitRuns = ceilDivide(positionSize, rateLimit);
-            uint256 gasUnitsRateLimitedL1 = l1RateLimitedGasUnits *
-                rateLimitRuns;
-            uint256 gasUnitsRateLimitedL2 = l2RateLimitedGasUnits *
-                rateLimitRuns;
+            uint256 rateLimitRuns = ceilDivide(
+                runtimeParams.positionSize,
+                runtimeParams.rateLimit
+            );
+            uint256 gasUnitsRateLimitedL1 = runtimeParams
+                .l1RateLimitedGasUnits * rateLimitRuns;
+            uint256 gasUnitsRateLimitedL2 = runtimeParams
+                .l2RateLimitedGasUnits * rateLimitRuns;
 
             // Flag gas units
-            uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds * l1FlagGasUnits;
-            uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds * l2FlagGasUnits;
+            uint256 gasUnitsFlagL1 = runtimeParams.numberOfUpdatedFeeds *
+                runtimeParams.l1FlagGasUnits;
+            uint256 gasUnitsFlagL2 = runtimeParams.numberOfUpdatedFeeds *
+                runtimeParams.l2FlagGasUnits;
 
             gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
             gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
-        } else if (executionKind == KIND_FLAG) {
+        } else if (runtimeParams.executionKind == KIND_FLAG) {
             // Flag gas units
-            gasUnitsL1 = numberOfUpdatedFeeds * l1FlagGasUnits;
-            gasUnitsL2 = numberOfUpdatedFeeds * l2FlagGasUnits;
-        } else if (executionKind == KIND_LIQUIDATE) {
+            gasUnitsL1 =
+                runtimeParams.numberOfUpdatedFeeds *
+                runtimeParams.l1FlagGasUnits;
+            gasUnitsL2 =
+                runtimeParams.numberOfUpdatedFeeds *
+                runtimeParams.l2FlagGasUnits;
+        } else if (runtimeParams.executionKind == KIND_LIQUIDATE) {
             // Iterations is fixed to 1 for liquidations
-            gasUnitsL1 = l1RateLimitedGasUnits;
-            gasUnitsL2 = l2RateLimitedGasUnits;
+            gasUnitsL1 = runtimeParams.l1RateLimitedGasUnits;
+            gasUnitsL2 = runtimeParams.l2RateLimitedGasUnits;
         } else {
             revert("Invalid execution kind");
         }

@@ -7,7 +7,7 @@ import "./mocks/MockOvmGasPriceOracle.sol";
 
 contract TxGasPriceOracleTest is Test {
     TxGasPriceOracle txGasPriceOracle;
-    bytes mockParameters;
+    bytes parameters;
 
     uint256 private constant UNIT = 10 ** uint(18);
 
@@ -19,16 +19,18 @@ contract TxGasPriceOracleTest is Test {
     function setUp() public {
         MockOvmGasPriceOracle mockOvmGasPriceOracle = new MockOvmGasPriceOracle();
         txGasPriceOracle = new TxGasPriceOracle(
-            address(mockOvmGasPriceOracle), // goerli-ovm: 0x420000000000000000000000000000000000000F
-            15,
-            20,
-            60,
-            70,
-            100,
-            110
+            address(mockOvmGasPriceOracle) // goerli-ovm: 0x420000000000000000000000000000000000000F
         );
 
-        mockParameters = abi.encode(address(0), uint128(1));
+        parameters = abi.encode(
+            address(0),
+            uint256(15),
+            uint256(20),
+            uint256(60),
+            uint256(70),
+            uint256(100),
+            uint256(110)
+        );
     }
 
     function getRuntime(
@@ -62,7 +64,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -80,7 +82,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -99,7 +101,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -118,7 +120,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -137,7 +139,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -163,7 +165,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
@@ -189,7 +191,7 @@ contract TxGasPriceOracleTest is Test {
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
             nullNodeOutputs,
-            mockParameters,
+            parameters,
             runtimeKeys,
             runtimeValues
         );
