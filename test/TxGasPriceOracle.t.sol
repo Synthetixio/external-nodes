@@ -22,10 +22,8 @@ contract TxGasPriceOracleTest is Test {
             address(mockOvmGasPriceOracle), // goerli-ovm: 0x420000000000000000000000000000000000000F
             15,
             20,
-            25,
-            30,
-            35,
-            40,
+            60,
+            70,
             100,
             110
         );
@@ -126,7 +124,7 @@ contract TxGasPriceOracleTest is Test {
         );
         assertEq(nodeOutput.timestamp, block.timestamp);
 
-        assertEq(nodeOutput.price, 7434000);
+        assertEq(nodeOutput.price, 7555000);
     }
 
     function test_Flag_5_feeds() public {
@@ -145,7 +143,7 @@ contract TxGasPriceOracleTest is Test {
         );
         assertEq(nodeOutput.timestamp, block.timestamp);
 
-        assertEq(nodeOutput.price, 7693500);
+        assertEq(nodeOutput.price, 8177500);
     }
 
     function test_RequiredMargin_5_feeds_1_step() public {
@@ -171,7 +169,7 @@ contract TxGasPriceOracleTest is Test {
         );
         assertEq(nodeOutput.timestamp, block.timestamp);
 
-        assertEq(nodeOutput.price, 8039000);
+        assertEq(nodeOutput.price, 8523000);
     }
 
     function test_RequiredMargin_5_feeds_3_step() public {
@@ -197,6 +195,6 @@ contract TxGasPriceOracleTest is Test {
         );
         assertEq(nodeOutput.timestamp, block.timestamp);
 
-        assertEq(nodeOutput.price, 8730000);
+        assertEq(nodeOutput.price, 9214000);
     }
 }

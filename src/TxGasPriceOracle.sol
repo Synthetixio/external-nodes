@@ -20,10 +20,8 @@ contract TxGasPriceOracle is IExternalNode {
     uint256 private immutable l2ExecuteGasUnits;
 
     // Flag
-    uint256 private immutable variableL1FlagGasUnits;
-    uint256 private immutable variableL2FlagGasUnits;
-    uint256 private immutable fixedL1FlagGasUnits;
-    uint256 private immutable fixedL2FlagGasUnits;
+    uint256 private immutable l1FlagGasUnits;
+    uint256 private immutable l2FlagGasUnits;
 
     // Liquidate (Rate limited)
     uint256 private immutable l1RateLimitedGasUnits;
@@ -33,10 +31,8 @@ contract TxGasPriceOracle is IExternalNode {
         address _ovmGasPriceOracleAddress,
         uint256 _L1ExecuteGasUnits,
         uint256 _L2ExecuteGasUnits,
-        uint256 _variableL1FlagGasUnits,
-        uint256 _variableL2FlagGasUnits,
-        uint256 _fixedL1FlagGasUnits,
-        uint256 _fixedL2FlagGasUnits,
+        uint256 _l1FlagGasUnits,
+        uint256 _l2FlagGasUnits,
         uint256 _l1RateLimitedGasUnits,
         uint256 _l2RateLimitedGasUnits
     ) {
@@ -46,10 +42,8 @@ contract TxGasPriceOracle is IExternalNode {
         // Params configuration
         l1ExecuteGasUnits = _L1ExecuteGasUnits;
         l2ExecuteGasUnits = _L2ExecuteGasUnits;
-        variableL1FlagGasUnits = _variableL1FlagGasUnits;
-        variableL2FlagGasUnits = _variableL2FlagGasUnits;
-        fixedL1FlagGasUnits = _fixedL1FlagGasUnits;
-        fixedL2FlagGasUnits = _fixedL2FlagGasUnits;
+        l1FlagGasUnits = _l1FlagGasUnits;
+        l2FlagGasUnits = _l2FlagGasUnits;
         l1RateLimitedGasUnits = _l1RateLimitedGasUnits;
         l2RateLimitedGasUnits = _l2RateLimitedGasUnits;
     }
@@ -141,25 +135,15 @@ contract TxGasPriceOracle is IExternalNode {
                 rateLimitRuns;
 
             // Flag gas units
-            uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds *
-                variableL1FlagGasUnits +
-                fixedL1FlagGasUnits;
-            uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds *
-                variableL2FlagGasUnits +
-                fixedL2FlagGasUnits;
+            uint256 gasUnitsFlagL1 = numberOfUpdatedFeeds * l1FlagGasUnits;
+            uint256 gasUnitsFlagL2 = numberOfUpdatedFeeds * l2FlagGasUnits;
 
             gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
             gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
         } else if (executionKind == KIND_FLAG) {
             // Flag gas units
-            gasUnitsL1 =
-                numberOfUpdatedFeeds *
-                variableL1FlagGasUnits +
-                fixedL1FlagGasUnits;
-            gasUnitsL2 =
-                numberOfUpdatedFeeds *
-                variableL2FlagGasUnits +
-                fixedL2FlagGasUnits;
+            gasUnitsL1 = numberOfUpdatedFeeds * l1FlagGasUnits;
+            gasUnitsL2 = numberOfUpdatedFeeds * l2FlagGasUnits;
         } else if (executionKind == KIND_LIQUIDATE) {
             // Iterations is fixed to 1 for liquidations
             gasUnitsL1 = l1RateLimitedGasUnits;
