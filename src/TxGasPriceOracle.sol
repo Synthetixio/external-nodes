@@ -150,11 +150,37 @@ contract TxGasPriceOracle is IExternalNode {
 
     function isValid(
         NodeDefinition.Data memory nodeDefinition
-    ) external pure returns (bool valid) {
+    ) external view returns (bool valid) {
         // Must have no parents
         if (nodeDefinition.parents.length > 0) {
             return false;
         }
+
+        // must be able to decode parameters
+        RuntimeParams memory runtimeParams;
+        (
+            ,
+            runtimeParams.l1ExecuteGasUnits,
+            runtimeParams.l2ExecuteGasUnits,
+            runtimeParams.l1FlagGasUnits,
+            runtimeParams.l2FlagGasUnits,
+            runtimeParams.l1RateLimitedGasUnits,
+            runtimeParams.l2RateLimitedGasUnits
+        ) = abi.decode(
+            nodeDefinition.parameters,
+            (address, uint256, uint256, uint256, uint256, uint256, uint256)
+        );
+
+        // Must be able to call the oracle
+        IOVM_GasPriceOracle ovmGasPriceOracle = IOVM_GasPriceOracle(
+            ovmGasPriceOracleAddress
+        );
+
+        ovmGasPriceOracle.gasPrice();
+        ovmGasPriceOracle.overhead();
+        ovmGasPriceOracle.l1BaseFee();
+        ovmGasPriceOracle.decimals();
+        ovmGasPriceOracle.scalar();
 
         return true;
     }
