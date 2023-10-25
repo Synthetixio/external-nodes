@@ -14,19 +14,6 @@ contract TxGasPriceOracle is IExternalNode {
     uint256 public constant KIND_REQUIRED_MARGIN = 1;
     uint256 public constant KIND_FLAG = 2;
     uint256 public constant KIND_LIQUIDATE = 3;
-
-    // // Order execution
-    // uint256 private immutable l1ExecuteGasUnits;
-    // uint256 private immutable l2ExecuteGasUnits;
-
-    // // Flag
-    // uint256 private immutable l1FlagGasUnits;
-    // uint256 private immutable l2FlagGasUnits;
-
-    // // Liquidate (Rate limited)
-    // uint256 private immutable l1RateLimitedGasUnits;
-    // uint256 private immutable l2RateLimitedGasUnits;
-
     struct RuntimeParams {
         // Order execution
         uint256 l1ExecuteGasUnits;
