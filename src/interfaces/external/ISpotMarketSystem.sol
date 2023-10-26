@@ -11,8 +11,9 @@ interface ISpotMarketSystem {
 
     function quoteSellExactIn(
         uint128 marketId,
-        uint256 synthAmount
-    ) external view returns (uint256 returnAmount, OrderFeeData memory fees);
+        uint256 synthAmount,
+        bool useStrictStalenessTolerance
+    ) external view returns (uint256 returnAmount, OrderFees.Data memory fees);
 
     function getSynth(
         uint128 marketId

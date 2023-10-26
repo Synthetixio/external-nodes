@@ -31,10 +31,14 @@ contract SpotMarketOracle is IExternalNode {
         (, uint128 marketId) = abi.decode(parameters, (address, uint128));
 
         uint256 synthAmount;
+        bool useStrictStalenessTolerance;
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
             if (runtimeKeys[i] == "size") {
                 synthAmount = uint256(runtimeValues[i]);
-                break;
+            }
+
+            if (runtimeKeys[i] == "useStrictStalenessTolerance") {
+                useStrictStalenessTolerance = _bytes32ToBool(runtimeValues[i]);
             }
         }
 
@@ -43,7 +47,7 @@ contract SpotMarketOracle is IExternalNode {
         }
 
         (uint256 synthValue, ) = ISpotMarketSystem(spotMarketAddress)
-            .quoteSellExactIn(marketId, synthAmount);
+            .quoteSellExactIn(marketId, synthAmount, useStrictStalenessTolerance);
 
         return
             NodeOutput.Data(
@@ -85,5 +89,21 @@ contract SpotMarketOracle is IExternalNode {
         return
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == this.supportsInterface.selector;
+    }
+
+    function _bytes32ToBool(bytes32 data) internal pure returns (bool) {
+        // Define specific bytes32 values to represent true and false
+        bytes32 trueValue = 0x0000000000000000000000000000000000000000000000000000000000000001;
+        bytes32 falseValue = 0x0000000000000000000000000000000000000000000000000000000000000000;
+
+        // Compare the input data with the values
+        if (data == trueValue) {
+            return true;
+        } else if (data == falseValue) {
+            return false;
+        }
+
+        // If the input data doesn't match either, you can handle it as needed.
+        revert("Invalid input data");
     }
 }
