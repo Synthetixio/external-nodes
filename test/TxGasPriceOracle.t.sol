@@ -12,7 +12,7 @@ contract TxGasPriceOracleTest is Test {
     uint256 private constant UNIT = 10 ** uint(18);
 
     uint256 private constant KIND_SETTLEMENT = 0;
-    uint256 private constant KIND_REQUIRED_MARGIN = 1;
+    uint256 private constant KIND_LIQUIDATION_ELIGIBILITY = 1;
     uint256 private constant KIND_FLAG = 2;
     uint256 private constant KIND_LIQUIDATE = 3;
 
@@ -159,7 +159,7 @@ contract TxGasPriceOracleTest is Test {
                 positionSize,
                 rateLimit,
                 numberOfUpdatedFeeds,
-                KIND_REQUIRED_MARGIN
+                KIND_LIQUIDATION_ELIGIBILITY
             );
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
@@ -185,7 +185,7 @@ contract TxGasPriceOracleTest is Test {
                 positionSize,
                 rateLimit,
                 numberOfUpdatedFeeds,
-                KIND_REQUIRED_MARGIN
+                KIND_LIQUIDATION_ELIGIBILITY
             );
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 

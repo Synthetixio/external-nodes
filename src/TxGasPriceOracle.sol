@@ -11,7 +11,7 @@ contract TxGasPriceOracle is IExternalNode {
     address public immutable ovmGasPriceOracleAddress;
 
     uint256 public constant KIND_SETTLEMENT = 0;
-    uint256 public constant KIND_REQUIRED_MARGIN = 1;
+    uint256 public constant KIND_LIQUIDATION_ELIGIBILITY = 1;
     uint256 public constant KIND_FLAG = 2;
     uint256 public constant KIND_LIQUIDATE = 3;
     struct RuntimeParams {
@@ -107,7 +107,9 @@ contract TxGasPriceOracle is IExternalNode {
         if (runtimeParams.executionKind == KIND_SETTLEMENT) {
             gasUnitsL1 = runtimeParams.l1ExecuteGasUnits;
             gasUnitsL2 = runtimeParams.l2ExecuteGasUnits;
-        } else if (runtimeParams.executionKind == KIND_REQUIRED_MARGIN) {
+        } else if (
+            runtimeParams.executionKind == KIND_LIQUIDATION_ELIGIBILITY
+        ) {
             // Rate limit gas units
             uint256 rateLimitRuns = ceilDivide(
                 runtimeParams.positionSize,
