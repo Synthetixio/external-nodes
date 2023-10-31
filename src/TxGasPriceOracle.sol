@@ -16,14 +16,14 @@ contract TxGasPriceOracle is IExternalNode {
     uint256 public constant KIND_LIQUIDATE = 3;
     struct RuntimeParams {
         // Order execution
-        uint256 l1ExecuteGasUnits;
-        uint256 l2ExecuteGasUnits;
+        uint256 l1SettleGasUnits;
+        uint256 l2SettleGasUnits;
         // Flag
         uint256 l1FlagGasUnits;
         uint256 l2FlagGasUnits;
         // Liquidate (Rate limited)
-        uint256 l1RateLimitedGasUnits;
-        uint256 l2RateLimitedGasUnits;
+        uint256 l1LiquidateGasUnits;
+        uint256 l2LiquidateGasUnits;
         // Call params
         uint256 numberOfChunks;
         uint256 numberOfUpdatedFeeds;
@@ -44,12 +44,12 @@ contract TxGasPriceOracle is IExternalNode {
         RuntimeParams memory runtimeParams;
         (
             ,
-            runtimeParams.l1ExecuteGasUnits,
-            runtimeParams.l2ExecuteGasUnits,
+            runtimeParams.l1SettleGasUnits,
+            runtimeParams.l2SettleGasUnits,
             runtimeParams.l1FlagGasUnits,
             runtimeParams.l2FlagGasUnits,
-            runtimeParams.l1RateLimitedGasUnits,
-            runtimeParams.l2RateLimitedGasUnits
+            runtimeParams.l1LiquidateGasUnits,
+            runtimeParams.l2LiquidateGasUnits
         ) = abi.decode(
             parameters,
             (address, uint256, uint256, uint256, uint256, uint256, uint256)
@@ -100,16 +100,16 @@ contract TxGasPriceOracle is IExternalNode {
         RuntimeParams memory runtimeParams
     ) internal pure returns (uint256 gasUnitsL1, uint256 gasUnitsL2) {
         if (runtimeParams.executionKind == KIND_SETTLEMENT) {
-            gasUnitsL1 = runtimeParams.l1ExecuteGasUnits;
-            gasUnitsL2 = runtimeParams.l2ExecuteGasUnits;
+            gasUnitsL1 = runtimeParams.l1SettleGasUnits;
+            gasUnitsL2 = runtimeParams.l2SettleGasUnits;
         } else if (
             runtimeParams.executionKind == KIND_LIQUIDATION_ELIGIBILITY
         ) {
             // Rate limit gas units
-            uint256 gasUnitsRateLimitedL1 = runtimeParams
-                .l1RateLimitedGasUnits * runtimeParams.numberOfChunks;
-            uint256 gasUnitsRateLimitedL2 = runtimeParams
-                .l2RateLimitedGasUnits * runtimeParams.numberOfChunks;
+            uint256 gasUnitsLiquidateL1 = runtimeParams.l1LiquidateGasUnits *
+                runtimeParams.numberOfChunks;
+            uint256 gasUnitsLiquidateL2 = runtimeParams.l2LiquidateGasUnits *
+                runtimeParams.numberOfChunks;
 
             // Flag gas units
             uint256 gasUnitsFlagL1 = runtimeParams.numberOfUpdatedFeeds *
@@ -117,8 +117,8 @@ contract TxGasPriceOracle is IExternalNode {
             uint256 gasUnitsFlagL2 = runtimeParams.numberOfUpdatedFeeds *
                 runtimeParams.l2FlagGasUnits;
 
-            gasUnitsL1 = gasUnitsFlagL1 + gasUnitsRateLimitedL1;
-            gasUnitsL2 = gasUnitsFlagL2 + gasUnitsRateLimitedL2;
+            gasUnitsL1 = gasUnitsFlagL1 + gasUnitsLiquidateL1;
+            gasUnitsL2 = gasUnitsFlagL2 + gasUnitsLiquidateL2;
         } else if (runtimeParams.executionKind == KIND_FLAG) {
             // Flag gas units
             gasUnitsL1 =
@@ -129,8 +129,8 @@ contract TxGasPriceOracle is IExternalNode {
                 runtimeParams.l2FlagGasUnits;
         } else if (runtimeParams.executionKind == KIND_LIQUIDATE) {
             // Iterations is fixed to 1 for liquidations
-            gasUnitsL1 = runtimeParams.l1RateLimitedGasUnits;
-            gasUnitsL2 = runtimeParams.l2RateLimitedGasUnits;
+            gasUnitsL1 = runtimeParams.l1LiquidateGasUnits;
+            gasUnitsL2 = runtimeParams.l2LiquidateGasUnits;
         } else {
             revert("Invalid execution kind");
         }
@@ -148,12 +148,12 @@ contract TxGasPriceOracle is IExternalNode {
         RuntimeParams memory runtimeParams;
         (
             ,
-            runtimeParams.l1ExecuteGasUnits,
-            runtimeParams.l2ExecuteGasUnits,
+            runtimeParams.l1SettleGasUnits,
+            runtimeParams.l2SettleGasUnits,
             runtimeParams.l1FlagGasUnits,
             runtimeParams.l2FlagGasUnits,
-            runtimeParams.l1RateLimitedGasUnits,
-            runtimeParams.l2RateLimitedGasUnits
+            runtimeParams.l1LiquidateGasUnits,
+            runtimeParams.l2LiquidateGasUnits
         ) = abi.decode(
             nodeDefinition.parameters,
             (address, uint256, uint256, uint256, uint256, uint256, uint256)
