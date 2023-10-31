@@ -25,8 +25,7 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 l1RateLimitedGasUnits;
         uint256 l2RateLimitedGasUnits;
         // Call params
-        uint256 positionSize;
-        uint256 rateLimit;
+        uint256 numberOfChunks;
         uint256 numberOfUpdatedFeeds;
         uint256 executionKind;
     }
@@ -61,12 +60,8 @@ contract TxGasPriceOracle is IExternalNode {
                 runtimeParams.executionKind = uint256(runtimeValues[i]);
                 continue;
             }
-            if (runtimeKeys[i] == "positionSize") {
-                runtimeParams.positionSize = uint256(runtimeValues[i]);
-                continue;
-            }
-            if (runtimeKeys[i] == "rateLimit") {
-                runtimeParams.rateLimit = uint256(runtimeValues[i]);
+            if (runtimeKeys[i] == "numberOfChunks") {
+                runtimeParams.numberOfChunks = uint256(runtimeValues[i]);
                 continue;
             }
             if (runtimeKeys[i] == "numberOfUpdatedFeeds") {
@@ -111,14 +106,10 @@ contract TxGasPriceOracle is IExternalNode {
             runtimeParams.executionKind == KIND_LIQUIDATION_ELIGIBILITY
         ) {
             // Rate limit gas units
-            uint256 rateLimitRuns = ceilDivide(
-                runtimeParams.positionSize,
-                runtimeParams.rateLimit
-            );
             uint256 gasUnitsRateLimitedL1 = runtimeParams
-                .l1RateLimitedGasUnits * rateLimitRuns;
+                .l1RateLimitedGasUnits * runtimeParams.numberOfChunks;
             uint256 gasUnitsRateLimitedL2 = runtimeParams
-                .l2RateLimitedGasUnits * rateLimitRuns;
+                .l2RateLimitedGasUnits * runtimeParams.numberOfChunks;
 
             // Flag gas units
             uint256 gasUnitsFlagL1 = runtimeParams.numberOfUpdatedFeeds *
@@ -143,11 +134,6 @@ contract TxGasPriceOracle is IExternalNode {
         } else {
             revert("Invalid execution kind");
         }
-    }
-
-    function ceilDivide(uint a, uint b) internal pure returns (uint) {
-        if (b == 0) return 0;
-        return a / b + (a % b == 0 ? 0 : 1);
     }
 
     function isValid(

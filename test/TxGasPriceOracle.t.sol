@@ -34,8 +34,7 @@ contract TxGasPriceOracleTest is Test {
     }
 
     function getRuntime(
-        uint256 positionSize,
-        uint256 rateLimit,
+        uint256 numberOfChunks,
         uint256 numberOfUpdatedFeeds,
         uint256 executionKind
     )
@@ -45,21 +44,19 @@ contract TxGasPriceOracleTest is Test {
     {
         runtimeKeys = new bytes32[](4);
         runtimeValues = new bytes32[](4);
-        runtimeKeys[0] = bytes32("positionSize");
-        runtimeKeys[1] = bytes32("rateLimit");
-        runtimeKeys[2] = bytes32("numberOfUpdatedFeeds");
-        runtimeKeys[3] = bytes32("executionKind");
-        runtimeValues[0] = bytes32(positionSize);
-        runtimeValues[1] = bytes32(rateLimit);
-        runtimeValues[2] = bytes32(numberOfUpdatedFeeds);
-        runtimeValues[3] = bytes32(executionKind);
+        runtimeKeys[0] = bytes32("numberOfChunks");
+        runtimeKeys[1] = bytes32("numberOfUpdatedFeeds");
+        runtimeKeys[2] = bytes32("executionKind");
+        runtimeValues[0] = bytes32(numberOfChunks);
+        runtimeValues[1] = bytes32(numberOfUpdatedFeeds);
+        runtimeValues[2] = bytes32(executionKind);
     }
 
     function test_Settlement() public {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, 0, KIND_SETTLEMENT);
+        ) = getRuntime(0, 0, KIND_SETTLEMENT);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -77,7 +74,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, 0, KIND_LIQUIDATE);
+        ) = getRuntime(0, 0, KIND_LIQUIDATE);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -96,7 +93,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -115,7 +112,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -134,7 +131,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -148,16 +145,14 @@ contract TxGasPriceOracleTest is Test {
         assertEq(nodeOutput.price, 8177500);
     }
 
-    function test_RequiredMargin_5_feeds_1_step() public {
-        uint256 positionSize = 10 * UNIT;
-        uint256 rateLimit = 100 * UNIT;
+    function test_LiquidationElegibility_5_feeds_1_step() public {
+        uint256 numberOfChunks = 1;
         uint256 numberOfUpdatedFeeds = 5;
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
         ) = getRuntime(
-                positionSize,
-                rateLimit,
+                numberOfChunks,
                 numberOfUpdatedFeeds,
                 KIND_LIQUIDATION_ELIGIBILITY
             );
@@ -174,16 +169,14 @@ contract TxGasPriceOracleTest is Test {
         assertEq(nodeOutput.price, 8523000);
     }
 
-    function test_RequiredMargin_5_feeds_3_step() public {
-        uint256 positionSize = 210 * UNIT;
-        uint256 rateLimit = 100 * UNIT;
+    function test_LiquidationElegibility_5_feeds_3_step() public {
+        uint256 numberOfChunks = 3;
         uint256 numberOfUpdatedFeeds = 5;
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
         ) = getRuntime(
-                positionSize,
-                rateLimit,
+                numberOfChunks,
                 numberOfUpdatedFeeds,
                 KIND_LIQUIDATION_ELIGIBILITY
             );
