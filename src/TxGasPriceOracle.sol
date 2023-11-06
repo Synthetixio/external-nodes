@@ -11,9 +11,8 @@ contract TxGasPriceOracle is IExternalNode {
     address public immutable ovmGasPriceOracleAddress;
 
     uint256 public constant KIND_SETTLEMENT = 0;
-    uint256 public constant KIND_LIQUIDATION_ELIGIBILITY = 1;
-    uint256 public constant KIND_FLAG = 2;
-    uint256 public constant KIND_LIQUIDATE = 3;
+    uint256 public constant KIND_FLAG = 1;
+    uint256 public constant KIND_LIQUIDATE = 2;
     struct RuntimeParams {
         // Order execution
         uint256 l1SettleGasUnits;
@@ -25,7 +24,6 @@ contract TxGasPriceOracle is IExternalNode {
         uint256 l1LiquidateGasUnits;
         uint256 l2LiquidateGasUnits;
         // Call params
-        uint256 numberOfChunks;
         uint256 numberOfUpdatedFeeds;
         uint256 executionKind;
     }
@@ -58,10 +56,6 @@ contract TxGasPriceOracle is IExternalNode {
         for (uint256 i = 0; i < runtimeKeys.length; i++) {
             if (runtimeKeys[i] == "executionKind") {
                 runtimeParams.executionKind = uint256(runtimeValues[i]);
-                continue;
-            }
-            if (runtimeKeys[i] == "numberOfChunks") {
-                runtimeParams.numberOfChunks = uint256(runtimeValues[i]);
                 continue;
             }
             if (runtimeKeys[i] == "numberOfUpdatedFeeds") {
@@ -102,23 +96,6 @@ contract TxGasPriceOracle is IExternalNode {
         if (runtimeParams.executionKind == KIND_SETTLEMENT) {
             gasUnitsL1 = runtimeParams.l1SettleGasUnits;
             gasUnitsL2 = runtimeParams.l2SettleGasUnits;
-        } else if (
-            runtimeParams.executionKind == KIND_LIQUIDATION_ELIGIBILITY
-        ) {
-            // Rate limit gas units
-            uint256 gasUnitsLiquidateL1 = runtimeParams.l1LiquidateGasUnits *
-                runtimeParams.numberOfChunks;
-            uint256 gasUnitsLiquidateL2 = runtimeParams.l2LiquidateGasUnits *
-                runtimeParams.numberOfChunks;
-
-            // Flag gas units
-            uint256 gasUnitsFlagL1 = runtimeParams.numberOfUpdatedFeeds *
-                runtimeParams.l1FlagGasUnits;
-            uint256 gasUnitsFlagL2 = runtimeParams.numberOfUpdatedFeeds *
-                runtimeParams.l2FlagGasUnits;
-
-            gasUnitsL1 = gasUnitsFlagL1 + gasUnitsLiquidateL1;
-            gasUnitsL2 = gasUnitsFlagL2 + gasUnitsLiquidateL2;
         } else if (runtimeParams.executionKind == KIND_FLAG) {
             // Flag gas units
             gasUnitsL1 =
