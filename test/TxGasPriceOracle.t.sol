@@ -12,9 +12,8 @@ contract TxGasPriceOracleTest is Test {
     uint256 private constant UNIT = 10 ** uint(18);
 
     uint256 private constant KIND_SETTLEMENT = 0;
-    uint256 private constant KIND_LIQUIDATION_ELIGIBILITY = 1;
-    uint256 private constant KIND_FLAG = 2;
-    uint256 private constant KIND_LIQUIDATE = 3;
+    uint256 private constant KIND_FLAG = 1;
+    uint256 private constant KIND_LIQUIDATE = 2;
 
     function setUp() public {
         MockOvmGasPriceOracle mockOvmGasPriceOracle = new MockOvmGasPriceOracle();
@@ -34,7 +33,6 @@ contract TxGasPriceOracleTest is Test {
     }
 
     function getRuntime(
-        uint256 numberOfChunks,
         uint256 numberOfUpdatedFeeds,
         uint256 executionKind
     )
@@ -42,12 +40,10 @@ contract TxGasPriceOracleTest is Test {
         pure
         returns (bytes32[] memory runtimeKeys, bytes32[] memory runtimeValues)
     {
-        runtimeKeys = new bytes32[](4);
-        runtimeValues = new bytes32[](4);
-        runtimeKeys[0] = bytes32("numberOfChunks");
+        runtimeKeys = new bytes32[](3);
+        runtimeValues = new bytes32[](3);
         runtimeKeys[1] = bytes32("numberOfUpdatedFeeds");
         runtimeKeys[2] = bytes32("executionKind");
-        runtimeValues[0] = bytes32(numberOfChunks);
         runtimeValues[1] = bytes32(numberOfUpdatedFeeds);
         runtimeValues[2] = bytes32(executionKind);
     }
@@ -56,7 +52,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, KIND_SETTLEMENT);
+        ) = getRuntime(0, KIND_SETTLEMENT);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -74,7 +70,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, 0, KIND_LIQUIDATE);
+        ) = getRuntime(0, KIND_LIQUIDATE);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -93,7 +89,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -112,7 +108,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -131,7 +127,7 @@ contract TxGasPriceOracleTest is Test {
         (
             bytes32[] memory runtimeKeys,
             bytes32[] memory runtimeValues
-        ) = getRuntime(0, numberOfUpdatedFeeds, KIND_FLAG);
+        ) = getRuntime(numberOfUpdatedFeeds, KIND_FLAG);
         NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
 
         NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
@@ -143,53 +139,5 @@ contract TxGasPriceOracleTest is Test {
         assertEq(nodeOutput.timestamp, block.timestamp);
 
         assertEq(nodeOutput.price, 8177500);
-    }
-
-    function test_LiquidationElegibility_5_feeds_1_step() public {
-        uint256 numberOfChunks = 1;
-        uint256 numberOfUpdatedFeeds = 5;
-        (
-            bytes32[] memory runtimeKeys,
-            bytes32[] memory runtimeValues
-        ) = getRuntime(
-                numberOfChunks,
-                numberOfUpdatedFeeds,
-                KIND_LIQUIDATION_ELIGIBILITY
-            );
-        NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
-
-        NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
-            nullNodeOutputs,
-            parameters,
-            runtimeKeys,
-            runtimeValues
-        );
-        assertEq(nodeOutput.timestamp, block.timestamp);
-
-        assertEq(nodeOutput.price, 8523000);
-    }
-
-    function test_LiquidationElegibility_5_feeds_3_step() public {
-        uint256 numberOfChunks = 3;
-        uint256 numberOfUpdatedFeeds = 5;
-        (
-            bytes32[] memory runtimeKeys,
-            bytes32[] memory runtimeValues
-        ) = getRuntime(
-                numberOfChunks,
-                numberOfUpdatedFeeds,
-                KIND_LIQUIDATION_ELIGIBILITY
-            );
-        NodeOutput.Data[] memory nullNodeOutputs = new NodeOutput.Data[](0);
-
-        NodeOutput.Data memory nodeOutput = txGasPriceOracle.process(
-            nullNodeOutputs,
-            parameters,
-            runtimeKeys,
-            runtimeValues
-        );
-        assertEq(nodeOutput.timestamp, block.timestamp);
-
-        assertEq(nodeOutput.price, 9214000);
     }
 }
