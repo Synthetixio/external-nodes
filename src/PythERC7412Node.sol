@@ -26,13 +26,22 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-        bytes32[] memory,
-        bytes32[] memory
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
     ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
+        (, bytes32 priceId, uint256 configuredStalenessTolerance) = abi.decode(
             parameters,
             (address, bytes32, uint256)
         );
+
+        uint256 runtimeStalenessTolerance;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "stalenessTolerance") {
+                runtimeStalenessTolerance = uint256(runtimeValues[i]);
+            }
+        }
+
+        uint256 stalenessTolerance = min(configuredStalenessTolerance, runtimeStalenessTolerance);
 
         IPyth pyth = IPyth(pythAddress);
         PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
@@ -161,5 +170,9 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             interfaceId == type(IExternalNode).interfaceId ||
             interfaceId == type(IERC7412).interfaceId ||
             interfaceId == this.supportsInterface.selector;
+    }
+
+    function min(uint x, uint y) internal pure returns (uint) {
+        return x < y ? x : y;
     }
 }
