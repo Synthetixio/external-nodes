@@ -9,6 +9,7 @@ import "./lib/NodeDefinition.sol";
 import "./interfaces/external/IExternalNode.sol";
 import "./interfaces/external/IPyth.sol";
 import "./interfaces/external/IERC7412.sol";
+import "./interfaces/external/PythStructs.sol";
 
 contract PythERC7412Node is IExternalNode, IERC7412 {
     using DecimalMath for int64;
@@ -16,6 +17,7 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
 
     int256 public constant PRECISION = 18;
     address public immutable pythAddress;
+    mapping(uint64 => PythStructs.Price) public benchmarkPrices;
 
     error NotSupported(uint8 updateType);
 
@@ -26,54 +28,72 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
     function process(
         NodeOutput.Data[] memory,
         bytes memory parameters,
-        bytes32[] memory,
-        bytes32[] memory
-    ) external view returns (NodeOutput.Data memory nodeOutput) {
-        (, bytes32 priceId, uint256 stalenessTolerance) = abi.decode(
+        bytes32[] memory runtimeKeys,
+        bytes32[] memory runtimeValues
+    ) external view returns (NodeOutput.Data memory) {
+        (, bytes32 priceId) = abi.decode(
             parameters,
-            (address, bytes32, uint256)
+            (address, bytes32)
         );
-
-        IPyth pyth = IPyth(pythAddress);
-        PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
-
-        int256 factor = PRECISION + pythData.expo;
-        int256 price = factor > 0
-            ? pythData.price.upscale(factor.toUint())
-            : pythData.price.downscale((-factor).toUint());
-
-        if (block.timestamp <= stalenessTolerance + pythData.publishTime) {
-            return NodeOutput.Data(price, pythData.publishTime, 0, 0);
-        }
 
         bytes32[] memory priceIds = new bytes32[](1);
         priceIds[0] = priceId;
+        
+        uint256 timestamp;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "timestamp") {
+                timestamp = uint256(runtimeValues[i]);
+                break;
+            }
+        }
+        
+        // The Staleness Tolerance Node could potentially set the runtime to its stalenessTolerance parameter value if it's unset
+        uint256 stalenessTolerance;
+        for (uint256 i = 0; i < runtimeKeys.length; i++) {
+            if (runtimeKeys[i] == "stalenessTolerance") {
+                stalenessTolerance = uint256(runtimeValues[i]);
+                break;
+            }
+        }
 
-        // In the future Pyth revert data will have the following
-        // Query schema:
-        //
-        // Enum PythQuery {
-        //  Latest = 0 {
-        //    bytes32[] priceIds,
-        //  },
-        //  NoOlderThan = 1 {
-        //    uint64 stalenessTolerance,
-        //    bytes32[] priceIds,
-        //  },
-        //  Benchmark = 2 {
-        //    uint64 publishTime,
-        //    bytes32[] priceIds,
-        //  }
-        // }
-        //
-        // This contract only implements the PythQuery::NoOlderThan
-        revert OracleDataRequired(
-            address(this),
-            abi.encode(
+        bytes memory oracleQuery;
+        if(timestamp == 0) {
+            IPyth pyth = IPyth(pythAddress);
+            PythStructs.Price memory pythData = pyth.getPriceUnsafe(priceId);
+
+            int256 factor = PRECISION + pythData.expo;
+            int256 price = factor > 0
+                ? pythData.price.upscale(factor.toUint())
+                : pythData.price.downscale((-factor).toUint());
+
+            if (block.timestamp - pythData.publishTime <= stalenessTolerance) {
+                return NodeOutput.Data(price, pythData.publishTime, 0, 0);
+            }
+
+            oracleQuery = abi.encode(
                 uint8(1), // PythQuery::NoOlderThan tag
                 uint64(stalenessTolerance),
                 priceIds
-            )
+            );
+        } else {
+            PythStructs.Price memory benchmarkPrice = benchmarkPrices[uint64(timestamp)];
+            if(benchmarkPrice.price != 0 && benchmarkPrice.expo != 0){
+                int256 factor = PRECISION + benchmarkPrice.expo;
+                int256 price = factor > 0
+                    ? benchmarkPrice.price.upscale(factor.toUint())
+                    : benchmarkPrice.price.downscale((-factor).toUint());
+                return NodeOutput.Data(price, benchmarkPrice.publishTime, 0, 0);
+            }
+            oracleQuery = abi.encode(
+                uint8(2), // PythQuery::Benchmark tag
+                uint64(timestamp),
+                priceIds
+            );
+        }
+
+        revert OracleDataRequired(
+            address(this),
+            oracleQuery
         );
     }
 
@@ -85,9 +105,9 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
             return false;
         }
 
-        (, bytes32 priceFeedId, ) = abi.decode(
+        (, bytes32 priceFeedId) = abi.decode(
             nodeDefinition.parameters,
-            (address, bytes32, uint256)
+            (address, bytes32)
         );
 
         // Must return relevant functions without error
@@ -108,34 +128,14 @@ contract PythERC7412Node is IExternalNode, IERC7412 {
         bytes memory signedOffchainData
     ) external payable {
         IPyth pyth = IPyth(pythAddress);
-
-        (
-            uint8 updateType,
-            uint64 stalenessTolerance,
-            bytes32[] memory priceIds,
-            bytes[] memory updateData
-        ) = abi.decode(signedOffchainData, (uint8, uint64, bytes32[], bytes[]));
-
-        if (updateType != 1) {
-            revert NotSupported(updateType);
-        }
-
-        uint64 minAcceptedPublishTime = uint64(block.timestamp) -
-            stalenessTolerance;
-
-        uint64[] memory publishTimes = new uint64[](priceIds.length);
-
-        for (uint i = 0; i < priceIds.length; i++) {
-            publishTimes[i] = minAcceptedPublishTime;
-        }
-
+        bytes[] memory updateData = abi.decode(signedOffchainData, (bytes[]));
+        
         try
-            pyth.updatePriceFeedsIfNecessary{value: msg.value}(
-                updateData,
-                priceIds,
-                publishTimes
+            pyth.updatePriceFeeds{value: msg.value}(
+                updateData
             )
         {
+            // TODO: If this is a price older than Pyth's latest (returning from a benchmark query) store it to benchmarkPrices
         } catch (bytes memory reason) {
             if (
                 reason.length == 4 &&
